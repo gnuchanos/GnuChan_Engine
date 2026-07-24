@@ -3336,7 +3336,7 @@ void Viewport::flush_canvas_parents_dirty_order() {
 
 void Viewport::_validate_property(PropertyInfo &property) const {
 	if (VisualServer::get_singleton()->is_low_end() && (property.name == "hdr" || property.name == "use_32_bpc_depth" || property.name == "debanding" || property.name == "sharpen_intensity" || property.name == "debug_draw")) {
-		// Only available in GLES3.
+		// Only available in GLES4.
 		property.usage = PROPERTY_USAGE_NOEDITOR | PROPERTY_USAGE_INTERNAL;
 	}
 

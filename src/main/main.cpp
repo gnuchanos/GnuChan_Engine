@@ -809,7 +809,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			editor = true;
 #ifdef DEBUG_METHODS_ENABLED
 		} else if (I->get() == "--gdnative-generate-json-api") {
-			// Register as an editor instance to use the GLES3 fallback automatically on hardware that doesn't support the GLES3 backend
+			// Register as an editor instance to use the GLES4 backend
 			editor = true;
 
 			// We still pass it to the main arguments since the argument handling itself is not done in this function

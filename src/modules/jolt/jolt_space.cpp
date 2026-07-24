@@ -11,6 +11,7 @@
 #include <Jolt/Physics/Body/BodyLockInterface.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/TempAllocator.h>
 
 // --- BroadPhaseLayerInterface implementation ---
@@ -41,16 +42,19 @@ namespace {
 	};
 }
 
-static BPLayerInterfaceImpl s_bp_layer_interface;
-static ObjectVsBPLayerFilterImpl s_obj_vs_bp;
-static ObjectLayerPairFilterImpl s_obj_pair;
-
-JoltSpaceData::JoltSpaceData() {}
+JoltSpaceData::JoltSpaceData()
+	: bp_layer_interface(new BPLayerInterfaceImpl())
+	, obj_vs_bp(new ObjectVsBPLayerFilterImpl())
+	, obj_pair(new ObjectLayerPairFilterImpl()) {
+}
 
 JoltSpaceData::~JoltSpaceData() {
 	delete system; system = nullptr;
 	delete static_cast<JPH::JobSystem *>(job_system); job_system = nullptr;
 	delete static_cast<JPH::TempAllocator *>(temp_allocator); temp_allocator = nullptr;
+	delete bp_layer_interface; bp_layer_interface = nullptr;
+	delete obj_vs_bp; obj_vs_bp = nullptr;
+	delete obj_pair; obj_pair = nullptr;
 }
 
 void JoltSpaceData::init() {
@@ -59,12 +63,12 @@ void JoltSpaceData::init() {
 	const JPH::uint max_body_pairs = 65536;
 	const JPH::uint max_contact_constraints = 10240;
 
-	job_system = new JPH::JobSystemThreadPool(1024, 64, 1);
+	job_system = new JPH::JobSystemSingleThreaded();
 	temp_allocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
 
 	system = new JPH::PhysicsSystem();
 	system->Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints,
-		s_bp_layer_interface, s_obj_vs_bp, s_obj_pair);
+		*bp_layer_interface, *obj_vs_bp, *obj_pair);
 }
 
 void JoltSpaceData::step(float p_step, JoltPhysicsServer *) {

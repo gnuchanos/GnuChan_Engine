@@ -9,6 +9,9 @@
 namespace JPH {
 class JobSystem;
 class TempAllocator;
+class BroadPhaseLayerInterface;
+class ObjectVsBroadPhaseLayerFilter;
+class ObjectLayerPairFilter;
 }
 
 class JoltPhysicsServer;
@@ -18,6 +21,9 @@ public:
 	JPH::PhysicsSystem *system = nullptr;
 	JPH::JobSystem *job_system = nullptr;
 	JPH::TempAllocator *temp_allocator = nullptr;
+	JPH::BroadPhaseLayerInterface *bp_layer_interface = nullptr;
+	JPH::ObjectVsBroadPhaseLayerFilter *obj_vs_bp = nullptr;
+	JPH::ObjectLayerPairFilter *obj_pair = nullptr;
 	bool active = true;
 	Vector<Vector3> debug_contacts;
 

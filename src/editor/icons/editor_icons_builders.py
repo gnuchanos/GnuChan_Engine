@@ -15,19 +15,30 @@ def make_editor_icons_action(target, source, env):
     svg_icons = source
 
     icons_string = StringIO()
+    MAX_LITERAL_LEN = 8000  # MSVC string literal limit is ~16380, stay safe
 
     for f in svg_icons:
-
         fname = str(f)
+        with open(fname, "rb") as svgf:
+            data = svgf.read()
+
+        # Build hex-escaped content in chunks to avoid MSVC C2026
+        hex_chunks = []
+        chunk = []
+        chunk_len = 0
+        for byte in data:
+            esc = "\\" + str(hex(byte))[1:]
+            chunk.append(esc)
+            chunk_len += len(esc)
+            if chunk_len >= MAX_LITERAL_LEN:
+                hex_chunks.append("".join(chunk))
+                chunk = []
+                chunk_len = 0
+        if chunk:
+            hex_chunks.append("".join(chunk))
 
         icons_string.write('\t"')
-
-        with open(fname, "rb") as svgf:
-            b = svgf.read(1)
-            while len(b) == 1:
-                icons_string.write("\\" + str(hex(ord(b)))[1:])
-                b = svgf.read(1)
-
+        icons_string.write('" "'.join(hex_chunks))
         icons_string.write('"')
         if fname != svg_icons[-1]:
             icons_string.write(",")

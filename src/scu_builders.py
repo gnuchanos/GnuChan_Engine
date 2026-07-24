@@ -300,7 +300,6 @@ def generate_scu_files(verbose, is_release_build):
     process_folder(["modules/gltf/extensions"])
     process_folder(["modules/gltf/extensions/physics"])
 
-    process_folder(["modules/bullet"])
     process_folder(["modules/navigation"])
     process_folder(["modules/visual_script"])
     process_folder(["modules/webrtc"])
@@ -341,8 +340,6 @@ def generate_scu_files(verbose, is_release_build):
     process_folder(["servers/visual"])
     process_folder(["servers/visual/portals"])
     process_folder(["servers/physics_2d"])
-    process_folder(["servers/physics"])
-    process_folder(["servers/physics/joints"])
     process_folder(["servers/audio"])
     process_folder(["servers/audio/effects"])
 

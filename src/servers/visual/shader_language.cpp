@@ -2327,7 +2327,7 @@ bool ShaderLanguage::_validate_function_call(BlockNode *p_block, OperatorNode *p
 			arglist += get_datatype_name(builtin_func_defs[builtin_idx].args[i]);
 		}
 
-		String err = "Built-in function \"" + String(name) + "(" + arglist + ")\" is only supported on the GLES3 backend.";
+		String err = "Built-in function \"" + String(name) + "(" + arglist + ")\" is only supported on the GLES4 backend.";
 		_set_error(err);
 		return false;
 	}
@@ -4779,7 +4779,7 @@ Error ShaderLanguage::_parse_block(BlockNode *p_block, const Map<StringName, Bui
 					bool unknown_size = false;
 
 					if (VisualServer::get_singleton()->is_low_end() && is_const) {
-						_set_error("Local const arrays are only supported on the GLES3 backend.");
+						_set_error("Local const arrays are only supported on the GLES4 backend.");
 						return ERR_PARSE_ERROR;
 					}
 
@@ -4823,7 +4823,7 @@ Error ShaderLanguage::_parse_block(BlockNode *p_block, const Map<StringName, Bui
 					tk = _get_token();
 					if (tk.type == TK_OP_ASSIGN) {
 						if (VisualServer::get_singleton()->is_low_end()) {
-							_set_error("Array initialization is only supported on the GLES3 backend.");
+							_set_error("Array initialization is only supported on the GLES4 backend.");
 							return ERR_PARSE_ERROR;
 						}
 
@@ -5140,7 +5140,7 @@ Error ShaderLanguage::_parse_block(BlockNode *p_block, const Map<StringName, Bui
 			}
 		} else if (tk.type == TK_CF_SWITCH) {
 			if (VisualServer::get_singleton()->is_low_end()) {
-				_set_error("\"switch\" operator is only supported on the GLES3 backend.");
+				_set_error("\"switch\" operator is only supported on the GLES4 backend.");
 				return ERR_PARSE_ERROR;
 			}
 
@@ -5655,7 +5655,7 @@ Error ShaderLanguage::_validate_datatype(DataType p_type) {
 		}
 
 		if (invalid_type) {
-			_set_error(vformat("\"%s\" type is only supported on the GLES3 backend.", get_datatype_name(p_type)));
+			_set_error(vformat("\"%s\" type is only supported on the GLES4 backend.", get_datatype_name(p_type)));
 			return ERR_UNAVAILABLE;
 		}
 	}
