@@ -1,0 +1,2 @@
+# Ignore both the GnuChan executable and generated installers.
+*.exe

@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+
+Import("env")
+
+# If we only platform is supported
+if env["platform"] == "windows" or env["platform"] == "linuxbsd" or env["platform"] == "osx":
+    # GLES4 uses desktop OpenGL core profile
+    pass
+
+env.add_source_files(env.drivers_sources, [
+    "shader_cache_gles4.cpp",
+    "shader_compiler_gles4.cpp",
+    "shader_gles4.cpp",
+    "rasterizer_storage_gles4.cpp",
+    "rasterizer_gles4.cpp",
+    "rasterizer_canvas_base_gles4.cpp",
+    "rasterizer_canvas_gles4.cpp",
+    "rasterizer_scene_gles4.cpp",
+])
+
+SConscript("shaders/SCsub")

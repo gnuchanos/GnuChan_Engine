@@ -1,0 +1,54 @@
+## Editor optimisation
+
+Lazy Loading → Sahneyi anında aç, ağır kaynakları (texture, mesh, preview) sonradan yükle.
+Viewport Culling → Editör kamerasında görünmeyen gizmo, collision ve helper çizimlerini render etme.
+SceneTree Virtualization → SceneTree'de sadece ekranda görünen satırları oluştur, diğerlerini yeniden kullan.
+Incremental Scene Loading → Büyük sahneleri tek seferde değil, parça parça yükle.
+Background Resource Loading → Texture, mesh, shader gibi kaynakları arka thread'de yükle.
+Background Import Pipeline → Asset import işlemlerini UI'ı kilitlemeden arka planda çalıştır.
+Thumbnail Cache → Preview resimlerini önbelleğe al, her seferinde yeniden oluşturma.
+FileSystem Watcher → Tüm proje klasörünü sürekli taramak yerine sadece değişen dosyaları takip et.
+Incremental File Scan → Projeyi baştan taramak yerine sadece değişen klasörleri güncelle.
+Inspector Lazy Update → Sadece seçili node'un Inspector'unu güncelle.
+Deferred Property Refresh → Property değişikliklerini tek tek değil, toplu güncelle.
+Cached Gizmo Rendering → Her frame gizmoları yeniden üretme, değişmediyse önbellekten çiz.
+LOD for Gizmos → Uzak objelerde basitleştirilmiş gizmo göster veya hiç gösterme.
+UI Draw Call Batching → Editör arayüzündeki gereksiz draw call'ları birleştir.
+Virtual File Browser → FileSystem dock'ta yalnızca görünen dosyaları oluştur.
+Scene Cache → Son açılan sahnelerin parse edilmiş halini önbellekte tut.
+Shader Compilation Cache → Aynı shader'ı tekrar derleme.
+Undo/Redo Optimization → Tüm objeyi kopyalamak yerine sadece değişen property'leri sakla.
+Multithreaded Scene Parsing → Büyük .tscn dosyalarını arka thread'de parse et.
+GPU Picking → Çok fazla obje seçimi gereken durumlarda CPU yerine GPU tabanlı picking kullan.
+Dirty Flag System → Değişmeyen node'ları yeniden hesaplama; sadece "kirlenen" node'ları güncelle.
+Redraw Region Tracking → Tüm editörü yeniden çizmek yerine sadece değişen UI bölgelerini yeniden çiz.
+Memory Pooling → Editörün sık oluşturup sildiği geçici objeleri tekrar kullan, sürekli allocation yapma.
+Plugin Lazy Initialization → Editör eklentilerini başlangıçta değil, ilk kullanıldığında başlat.
+Resource Dependency Cache → Hangi dosyanın hangisine bağlı olduğunu önbelleğe al, her değişiklikte yeniden analiz etme.
+
+## Engine optimisation
+Sleeping Physics → Hareketsiz fizik objelerini simülasyondan çıkar, hareket edince tekrar uyandır.
+GPU Instancing → Aynı mesh'i yüzlerce kez tek draw call ile çiz.
+Automatic Draw Call Batching → Küçük objeleri otomatik birleştirerek draw call sayısını azalt.
+Frustum Culling → Kameranın görmediği objeleri hiç render etme.
+Occlusion Culling → Başka objelerin arkasında kalan objeleri render etme.
+LOD (Level of Detail) → Uzak objelerin düşük poligonlu versiyonlarını kullan.
+Texture Streaming → Sadece ihtiyaç duyulan texture mip seviyelerini yükle.
+Automatic Resource Cache → Yüklenen resource'ları RAM'de tut, tekrar diskten okuma.
+Shader Cache / Pipeline Cache → Shader'ları ilk derlemeden sonra önbellekte tut, takılmaları azalt.
+Memory Pooling → Sık oluşturulup silinen objeler için sürekli allocation/free yapma.
+Job System / Multithreading → Fizik, animasyon, culling gibi işleri çekirdeklere dağıt.
+Dirty Transform System → Değişmeyen node'ların transform'unu yeniden hesaplama.
+Visibility Update Optimization → Görünürlük hesaplarını sadece değişiklik olduğunda yap.
+Spatial Partitioning (BVH / QuadTree / Octree) → Çarpışma ve görünürlük sorgularını tüm objeler yerine ilgili bölge üzerinde yap.
+Broad Phase Collision → Yakın olmayan objeleri çarpışma testine hiç sokma.
+Asynchronous Resource Loading → Oyun devam ederken asset'leri arka planda yükle.
+Animation Culling → Görünmeyen objelerin animasyonlarını güncelleme.
+Particle Culling → Görünmeyen particle sistemlerini durdur veya basitleştir.
+Audio Virtualization → Duyulmayacak kadar uzaktaki sesleri işlemeyi bırak.
+Automatic Mipmap Generation & Usage → Uzak texture'larda daha düşük çözünürlüklü mipmap kullan.
+GPU Skinning → İskelet animasyonlarını CPU yerine GPU'da hesapla.
+State Change Sorting → Aynı materyali kullanan objeleri peş peşe çizerek GPU state değişimlerini azalt.
+Object Pool Support → Mermi, düşman, efekt gibi nesneler için hazır object pool altyapısı sun.
+Incremental Garbage Collection → Bellek temizliğini tek seferde değil, parça parça yaparak frame drop'u önle.
+Compressed Resource Support → Texture ve asset'leri sıkıştırılmış formatta yükleyerek RAM kullanımını azalt.

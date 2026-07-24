@@ -1,0 +1,102 @@
+/**************************************************************************/
+/*  back_buffer_copy.cpp                                                  */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GNUCHAN ENGINE                             */
+/*                    https://github.com/gnuchanos/GnuChan_Engine         */
+/**************************************************************************/
+/* Copyright (C) 2025 GnuChan Engine contributors (see AUTHORS.md).      */
+/*                                                                        */
+/* This program is free software: you can redistribute it and/or modify   */
+/* it under the terms of the GNU General Public License as published by   */
+/* the Free Software Foundation, either version 3 of the License, or      */
+/* (at your option) any later version.                                    */
+/*                                                                        */
+/* This program is distributed in the hope that it will be useful,        */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of         */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the           */
+/* GNU General Public License for more details.                           */
+/*                                                                        */
+/* You should have received a copy of the GNU General Public License      */
+/* along with this program. If not, see <https://www.gnu.org/licenses/>.  */
+/**************************************************************************/
+
+#include "back_buffer_copy.h"
+
+void BackBufferCopy::_update_copy_mode() {
+	switch (copy_mode) {
+		case COPY_MODE_DISABLED: {
+			VS::get_singleton()->canvas_item_set_copy_to_backbuffer(get_canvas_item(), false, Rect2());
+		} break;
+		case COPY_MODE_RECT: {
+			VS::get_singleton()->canvas_item_set_copy_to_backbuffer(get_canvas_item(), true, rect);
+		} break;
+		case COPY_MODE_VIEWPORT: {
+			VS::get_singleton()->canvas_item_set_copy_to_backbuffer(get_canvas_item(), true, Rect2());
+
+		} break;
+	}
+}
+
+#ifdef TOOLS_ENABLED
+Rect2 BackBufferCopy::_edit_get_rect() const {
+	return rect;
+}
+
+bool BackBufferCopy::_edit_use_rect() const {
+	return true;
+}
+#endif
+
+Rect2 BackBufferCopy::get_anchorable_rect() const {
+	return rect;
+}
+
+void BackBufferCopy::set_rect(const Rect2 &p_rect) {
+	rect = p_rect;
+	_update_copy_mode();
+	item_rect_changed();
+}
+
+Rect2 BackBufferCopy::get_rect() const {
+	return rect;
+}
+
+void BackBufferCopy::set_copy_mode(CopyMode p_mode) {
+	copy_mode = p_mode;
+	_update_copy_mode();
+	_change_notify();
+}
+
+BackBufferCopy::CopyMode BackBufferCopy::get_copy_mode() const {
+	return copy_mode;
+}
+
+void BackBufferCopy::_validate_property(PropertyInfo &p_property) const {
+	if (copy_mode != COPY_MODE_RECT && p_property.name == "rect") {
+		p_property.usage = PROPERTY_USAGE_NOEDITOR;
+	}
+}
+
+void BackBufferCopy::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_rect", "rect"), &BackBufferCopy::set_rect);
+	ClassDB::bind_method(D_METHOD("get_rect"), &BackBufferCopy::get_rect);
+
+	ClassDB::bind_method(D_METHOD("set_copy_mode", "copy_mode"), &BackBufferCopy::set_copy_mode);
+	ClassDB::bind_method(D_METHOD("get_copy_mode"), &BackBufferCopy::get_copy_mode);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "copy_mode", PROPERTY_HINT_ENUM, "Disabled,Rect,Viewport"), "set_copy_mode", "get_copy_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::RECT2, "rect"), "set_rect", "get_rect");
+
+	BIND_ENUM_CONSTANT(COPY_MODE_DISABLED);
+	BIND_ENUM_CONSTANT(COPY_MODE_RECT);
+	BIND_ENUM_CONSTANT(COPY_MODE_VIEWPORT);
+}
+
+BackBufferCopy::BackBufferCopy() {
+	rect = Rect2(-100, -100, 200, 200);
+	copy_mode = COPY_MODE_RECT;
+	_update_copy_mode();
+}
+BackBufferCopy::~BackBufferCopy() {
+}

@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+Import("env")
+
+if "GLES4_GLSL" in env["BUILDERS"]:
+    env.GLES4_GLSL("copy.glsl")
+    env.GLES4_GLSL("resolve.glsl")
+    env.GLES4_GLSL("canvas.glsl")
+    env.GLES4_GLSL("canvas_shadow.glsl")
+    env.GLES4_GLSL("scene.glsl")
+    env.GLES4_GLSL("cubemap_filter.glsl")
+    env.GLES4_GLSL("cube_to_dp.glsl")
+    env.GLES4_GLSL("blend_shape.glsl")
+    env.GLES4_GLSL("screen_space_reflection.glsl")
+    env.GLES4_GLSL("effect_blur.glsl")
+    env.GLES4_GLSL("subsurf_scattering.glsl")
+    env.GLES4_GLSL("ssao.glsl")
+    env.GLES4_GLSL("ssao_minify.glsl")
+    env.GLES4_GLSL("ssao_blur.glsl")
+    env.GLES4_GLSL("exposure.glsl")
+    env.GLES4_GLSL("tonemap.glsl")
+    env.GLES4_GLSL("particles.glsl")
+    env.GLES4_GLSL("lens_distorted.glsl")
+    env.Depends(Glob("*.glsl.gen.h"), "#gles_builders.py")

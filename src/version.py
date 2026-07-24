@@ -1,0 +1,10 @@
+short_name = "gnuchan"
+name = "GnuChanEngine"
+major = 0
+minor = 1
+patch = 0
+status = "gc"
+module_config = ""
+year = 2025
+website = "https://github.com/gnuchanos/GnuChan_Engine"
+docs = "0.1"

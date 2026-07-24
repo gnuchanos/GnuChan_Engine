@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+Import("env")
+env_tp = env.Clone()
+if env["builtin_jolt"]:
+    env_j = env_tp.Clone()
+    env_j.add_source_files(env.modules_sources, "jolt/Jolt/Jolt.cpp")
+    env_j.Prepend(CPPPATH=["#thirdparty/jolt"])
+    if not env.msvc:
+        env_j.Prepend(CXXFLAGS=["-std=gnu++17"])
+    else:
+        env_j.Prepend(CXXFLAGS=["/std:c++17"])

@@ -1,0 +1,42 @@
+# Build output
+src/*/build/
+src/bin/
+build/
+_temp/*
+
+# SCons cache
+.scons_cache/
+.sconsign*.dblite
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Compiled
+*.exe
+*.dll
+*.so
+*.dylib
+*.obj
+*.o
+*.lib
+
+# Temp
+_temp_original_sources/
+
+# Windows reserved names / artifacts
+nul
+
+# Personal notes
+*.gctf
+
+# Build logs (spaced directory names)
+_temp/build-log-*/
+_temp/*.zip

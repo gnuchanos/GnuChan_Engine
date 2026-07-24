@@ -1,0 +1,166 @@
+/**************************************************************************/
+/*  arvr_nodes.h                                                          */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GNUCHAN ENGINE                             */
+/*                    https://github.com/gnuchanos/GnuChan_Engine         */
+/**************************************************************************/
+/* Copyright (C) 2025 GnuChan Engine contributors (see AUTHORS.md).      */
+/*                                                                        */
+/* This program is free software: you can redistribute it and/or modify   */
+/* it under the terms of the GNU General Public License as published by   */
+/* the Free Software Foundation, either version 3 of the License, or      */
+/* (at your option) any later version.                                    */
+/*                                                                        */
+/* This program is distributed in the hope that it will be useful,        */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of         */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the           */
+/* GNU General Public License for more details.                           */
+/*                                                                        */
+/* You should have received a copy of the GNU General Public License      */
+/* along with this program. If not, see <https://www.gnu.org/licenses/>.  */
+/**************************************************************************/
+
+#ifndef ARVR_NODES_H
+#define ARVR_NODES_H
+
+#include "scene/3d/camera.h"
+#include "scene/3d/spatial.h"
+#include "scene/resources/mesh.h"
+#include "servers/arvr/arvr_positional_tracker.h"
+
+/**
+	@a Author: GnuChan Engine contributors <gnuchanos@gmail.com>
+**/
+
+/*
+	ARVRCamera is a subclass of camera which will register itself with its parent ARVROrigin and as a result is automatically positioned
+*/
+class ARVRCamera : public Camera {
+	GDCLASS(ARVRCamera, Camera);
+
+protected:
+	void _notification(int p_what);
+
+public:
+	String get_configuration_warning() const;
+
+	virtual Vector3 project_local_ray_normal(const Point2 &p_pos) const;
+	virtual Point2 unproject_position(const Vector3 &p_pos) const;
+	virtual Vector3 project_position(const Point2 &p_point, float p_z_depth) const;
+	virtual Vector<Plane> get_frustum() const;
+
+	ARVRCamera();
+	~ARVRCamera();
+};
+
+/*
+	ARVRController is a helper node that automatically updates its position based on tracker data.
+
+	It must be a child node of our ARVROrigin node
+*/
+
+class ARVRController : public Spatial {
+	GDCLASS(ARVRController, Spatial);
+
+private:
+	int controller_id;
+	bool is_active;
+	int button_states;
+	Ref<Mesh> mesh;
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
+
+public:
+	void set_controller_id(int p_controller_id);
+	int get_controller_id() const;
+	String get_controller_name() const;
+
+	int get_joystick_id() const;
+	int is_button_pressed(int p_button) const;
+	float get_joystick_axis(int p_axis) const;
+
+	real_t get_rumble() const;
+	void set_rumble(real_t p_rumble);
+
+	bool get_is_active() const;
+	ARVRPositionalTracker::TrackerHand get_hand() const;
+
+	Ref<Mesh> get_mesh() const;
+
+	String get_configuration_warning() const;
+
+	ARVRController();
+	~ARVRController();
+};
+
+/*
+	ARVRAnchor is a helper node that automatically updates its position based on anchor data, it represents a real world location.
+	It must be a child node of our ARVROrigin node
+*/
+
+class ARVRAnchor : public Spatial {
+	GDCLASS(ARVRAnchor, Spatial);
+
+private:
+	int anchor_id;
+	bool is_active;
+	Vector3 size;
+	Ref<Mesh> mesh;
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
+
+public:
+	void set_anchor_id(int p_anchor_id);
+	int get_anchor_id() const;
+	String get_anchor_name() const;
+
+	bool get_is_active() const;
+	Vector3 get_size() const;
+
+	Plane get_plane() const;
+
+	Ref<Mesh> get_mesh() const;
+
+	String get_configuration_warning() const;
+
+	ARVRAnchor();
+	~ARVRAnchor();
+};
+
+/*
+	ARVROrigin is special spatial node that acts as our origin point mapping our real world center of our tracking volume into our virtual world.
+
+	It is this point that you will move around the world as the player 'moves while standing still', i.e. the player moves through teleporting or controller inputs as opposed to physically moving.
+
+	Our camera and controllers will always be child nodes and thus place relative to this origin point.
+	This node will automatically locate any camera child nodes and update its position while our ARVRController node will handle tracked controllers.
+*/
+class ARVROrigin : public Spatial {
+	GDCLASS(ARVROrigin, Spatial);
+
+private:
+	ARVRCamera *tracked_camera;
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
+
+public:
+	String get_configuration_warning() const;
+
+	void set_tracked_camera(ARVRCamera *p_tracked_camera);
+	void clear_tracked_camera_if(ARVRCamera *p_tracked_camera);
+
+	float get_world_scale() const;
+	void set_world_scale(float p_world_scale);
+
+	ARVROrigin();
+	~ARVROrigin();
+};
+
+#endif // ARVR_NODES_H

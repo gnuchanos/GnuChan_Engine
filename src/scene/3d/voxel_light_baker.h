@@ -1,0 +1,164 @@
+/**************************************************************************/
+/*  voxel_light_baker.h                                                   */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GNUCHAN ENGINE                             */
+/*                    https://github.com/gnuchanos/GnuChan_Engine         */
+/**************************************************************************/
+/* Copyright (C) 2025 GnuChan Engine contributors (see AUTHORS.md).      */
+/*                                                                        */
+/* This program is free software: you can redistribute it and/or modify   */
+/* it under the terms of the GNU General Public License as published by   */
+/* the Free Software Foundation, either version 3 of the License, or      */
+/* (at your option) any later version.                                    */
+/*                                                                        */
+/* This program is distributed in the hope that it will be useful,        */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of         */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the           */
+/* GNU General Public License for more details.                           */
+/*                                                                        */
+/* You should have received a copy of the GNU General Public License      */
+/* along with this program. If not, see <https://www.gnu.org/licenses/>.  */
+/**************************************************************************/
+
+#ifndef VOXEL_LIGHT_BAKER_H
+#define VOXEL_LIGHT_BAKER_H
+
+#include "scene/3d/mesh_instance.h"
+#include "scene/resources/multimesh.h"
+
+class VoxelLightBaker {
+public:
+	enum DebugMode {
+		DEBUG_ALBEDO,
+		DEBUG_LIGHT
+	};
+
+	enum BakeQuality {
+		BAKE_QUALITY_LOW,
+		BAKE_QUALITY_MEDIUM,
+		BAKE_QUALITY_HIGH
+	};
+
+	enum BakeMode {
+		BAKE_MODE_CONE_TRACE,
+		BAKE_MODE_RAY_TRACE,
+	};
+
+private:
+	enum {
+		CHILD_EMPTY = 0xFFFFFFFF
+
+	};
+
+	struct Cell {
+		uint32_t children[8];
+		float albedo[3]; //albedo in RGB24
+		float emission[3]; //accumulated light in 16:16 fixed point (needs to be integer for moving lights fast)
+		float normal[3];
+		uint32_t used_sides;
+		float alpha; //used for upsampling
+		int level;
+
+		Cell() {
+			for (int i = 0; i < 8; i++) {
+				children[i] = CHILD_EMPTY;
+			}
+
+			for (int i = 0; i < 3; i++) {
+				emission[i] = 0;
+				albedo[i] = 0;
+				normal[i] = 0;
+			}
+			alpha = 0;
+			used_sides = 0;
+			level = 0;
+		}
+	};
+
+	Vector<Cell> bake_cells;
+	int cell_subdiv;
+
+	struct Light {
+		int x, y, z;
+		float accum[6][3]; //rgb anisotropic
+		float direct_accum[6][3]; //for direct bake
+		int next_leaf;
+		Light() {
+			x = y = z = 0;
+			for (int i = 0; i < 6; i++) {
+				for (int j = 0; j < 3; j++) {
+					accum[i][j] = 0;
+					direct_accum[i][j] = 0;
+				}
+			}
+			next_leaf = 0;
+		}
+	};
+
+	int first_leaf;
+
+	Vector<Light> bake_light;
+
+	struct MaterialCache {
+		//128x128 textures
+		Vector<Color> albedo;
+		Vector<Color> emission;
+	};
+
+	Map<Ref<Material>, MaterialCache> material_cache;
+	int leaf_voxel_count;
+	bool direct_lights_baked;
+
+	AABB original_bounds;
+	AABB po2_bounds;
+	int axis_cell_size[3];
+
+	Transform to_cell_space;
+
+	int color_scan_cell_width;
+	int bake_texture_size;
+	float cell_size;
+	float propagation;
+
+	BakeQuality bake_quality;
+
+	int max_original_cells;
+
+	void _init_light_plot(int p_idx, int p_level, int p_x, int p_y, int p_z, uint32_t p_parent);
+
+	Vector<Color> _get_bake_texture(Ref<Image> p_image, const Color &p_color_mul, const Color &p_color_add);
+	MaterialCache _get_material_cache(Ref<Material> p_material);
+
+	void _plot_face(int p_idx, int p_level, int p_x, int p_y, int p_z, const Vector3 *p_vtx, const Vector3 *p_normal, const Vector2 *p_uv, const MaterialCache &p_material, const AABB &p_aabb);
+	void _fixup_plot(int p_idx, int p_level);
+	void _debug_mesh(int p_idx, int p_level, const AABB &p_aabb, Ref<MultiMesh> &p_multimesh, int &idx, DebugMode p_mode);
+	void _check_init_light();
+
+	uint32_t _find_cell_at_pos(const Cell *cells, int x, int y, int z);
+
+public:
+	void begin_bake(int p_subdiv, const AABB &p_bounds);
+	void plot_mesh(const Transform &p_xform, Ref<Mesh> &p_mesh, const Vector<Ref<Material>> &p_materials, const Ref<Material> &p_override_material);
+	void begin_bake_light(BakeQuality p_quality = BAKE_QUALITY_MEDIUM, float p_propagation = 0.85);
+	void plot_light_directional(const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, bool p_direct);
+	void plot_light_omni(const Vector3 &p_pos, const Color &p_color, float p_energy, float p_indirect_energy, float p_radius, float p_attenutation, bool p_direct);
+	void plot_light_spot(const Vector3 &p_pos, const Vector3 &p_axis, const Color &p_color, float p_energy, float p_indirect_energy, float p_radius, float p_attenutation, float p_spot_angle, float p_spot_attenuation, bool p_direct);
+	void end_bake();
+
+	struct LightMapData {
+		int width;
+		int height;
+		PoolVector<float> light;
+	};
+
+	PoolVector<int> create_gi_probe_data();
+	Ref<MultiMesh> create_debug_multimesh(DebugMode p_mode = DEBUG_ALBEDO);
+	PoolVector<uint8_t> create_capture_octree(int p_subdiv);
+
+	float get_cell_size() const;
+	Transform get_to_cell_space_xform() const;
+	VoxelLightBaker();
+};
+
+#endif // VOXEL_LIGHT_BAKER_H

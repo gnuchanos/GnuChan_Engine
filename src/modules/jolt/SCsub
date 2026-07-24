@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+
+Import("env")
+Import("env_modules")
+
+env_jolt = env_modules.Clone()
+
+env_jolt.add_source_files(env.modules_sources, "register_types.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_physics_server.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_space.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_body.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_area.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_joint.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_collision.cpp")
+env_jolt.add_source_files(env.modules_sources, "jolt_shape.cpp")
+
+# Jolt Physics thirdparty sources - use relative paths (no '#') so glob wildcards work
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/RegisterTypes.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Core/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Geometry/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Math/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/ObjectStream/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Body/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Collision/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Collision/BroadPhase/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Collision/Shape/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Constraints/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Character/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/SoftBody/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Vehicle/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Ragdoll/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Physics/Hair/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/Skeleton/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/TriangleSplitter/*.cpp")
+env_jolt.add_source_files(env.modules_sources, "../../thirdparty/jolt/Jolt/AABBTree/*.cpp")
+
+env_jolt.Prepend(CPPPATH=["#thirdparty/jolt/"])
+
+if not env.msvc:
+    env_jolt.Prepend(CXXFLAGS=["-std=gnu++17"])
+else:
+    env_jolt.Prepend(CXXFLAGS=["/std:c++17"])
