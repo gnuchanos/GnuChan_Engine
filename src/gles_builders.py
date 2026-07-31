@@ -189,7 +189,7 @@ def include_file_in_legacygl_header(filename, header_data, depth):
     return header_data
 
 
-def build_legacygl_header(filename, include, class_suffix, output_attribs, gles2=False):
+def build_legacygl_header(filename, include, class_suffix, output_attribs):
     header_data = LegacyGLHeaderStruct()
     include_file_in_legacygl_header(filename, header_data, 0)
 
@@ -230,7 +230,7 @@ def build_legacygl_header(filename, include, class_suffix, output_attribs, gles2
             fd.write("\t\t" + x.upper() + ",\n")
         fd.write("\t};\n\n")
 
-    supports_ubershader = not gles2 and "ubershader_flags" in header_data.uniforms
+    supports_ubershader = "ubershader_flags" in header_data.uniforms
     if supports_ubershader:
         fd.write("\tint get_ubershader_flags_uniform() const { return Uniforms::UBERSHADER_FLAGS; }\n\n")
 
@@ -517,67 +517,39 @@ def build_legacygl_header(filename, include, class_suffix, output_attribs, gles2
     fd.write("\t\tstatic const int _fragment_code_start=" + str(header_data.fragment_offset) + ";\n")
 
     if output_attribs:
-        if gles2:
-            fd.write(
-                "\t\tsetup(_conditional_strings,"
-                + str(len(header_data.conditionals))
-                + ",_uniform_strings,"
-                + str(len(header_data.uniforms))
-                + ",_attribute_pairs,"
-                + str(len(header_data.attributes))
-                + ", _texunit_pairs,"
-                + str(len(header_data.texunits))
-                + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
-            )
-        else:
-            fd.write(
-                "\t\tsetup(_conditional_strings,"
-                + str(len(header_data.conditionals))
-                + ",_uniform_strings,"
-                + str(len(header_data.uniforms))
-                + ",_attribute_pairs,"
-                + str(len(header_data.attributes))
-                + ", _texunit_pairs,"
-                + str(len(header_data.texunits))
-                + ",_ubo_pairs,"
-                + str(len(header_data.ubos))
-                + ",_feedbacks,"
-                + str(feedback_count)
-                + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
-            )
+        fd.write(
+            "\t\tsetup(_conditional_strings,"
+            + str(len(header_data.conditionals))
+            + ",_uniform_strings,"
+            + str(len(header_data.uniforms))
+            + ",_attribute_pairs,"
+            + str(len(header_data.attributes))
+            + ", _texunit_pairs,"
+            + str(len(header_data.texunits))
+            + ",_ubo_pairs,"
+            + str(len(header_data.ubos))
+            + ",_feedbacks,"
+            + str(feedback_count)
+            + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
+        )
     else:
-        if gles2:
-            fd.write(
-                "\t\tsetup(_conditional_strings,"
-                + str(len(header_data.conditionals))
-                + ",_uniform_strings,"
-                + str(len(header_data.uniforms))
-                + ",_texunit_pairs,"
-                + str(len(header_data.texunits))
-                + ",_enums,"
-                + str(len(header_data.enums))
-                + ",_enum_values,"
-                + str(enum_value_count)
-                + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
-            )
-        else:
-            fd.write(
-                "\t\tsetup(_conditional_strings,"
-                + str(len(header_data.conditionals))
-                + ",_uniform_strings,"
-                + str(len(header_data.uniforms))
-                + ",_texunit_pairs,"
-                + str(len(header_data.texunits))
-                + ",_enums,"
-                + str(len(header_data.enums))
-                + ",_enum_values,"
-                + str(enum_value_count)
-                + ",_ubo_pairs,"
-                + str(len(header_data.ubos))
-                + ",_feedbacks,"
-                + str(feedback_count)
-                + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
-            )
+        fd.write(
+            "\t\tsetup(_conditional_strings,"
+            + str(len(header_data.conditionals))
+            + ",_uniform_strings,"
+            + str(len(header_data.uniforms))
+            + ",_texunit_pairs,"
+            + str(len(header_data.texunits))
+            + ",_enums,"
+            + str(len(header_data.enums))
+            + ",_enum_values,"
+            + str(enum_value_count)
+            + ",_ubo_pairs,"
+            + str(len(header_data.ubos))
+            + ",_feedbacks,"
+            + str(feedback_count)
+            + ",_vertex_code,_fragment_code,_vertex_code_start,_fragment_code_start);\n"
+        )
 
     fd.write("\t}\n\n")
 

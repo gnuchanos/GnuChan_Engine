@@ -12,7 +12,7 @@ import os
 import sys
 import subprocess
 
-BUILD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_IDE")
+BUILD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 sys.path.insert(0, BUILD_DIR)
 from version import major, minor, patch, status as version_status, module_config
 
