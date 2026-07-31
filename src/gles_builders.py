@@ -7,6 +7,10 @@ All such functions are invoked in a subprocess on Windows to prevent build flaki
 from platform_methods import subprocess_main
 import re
 
+# GLES3/GLES4 header üretimi GLES2 davranışlarını devre dışı bırakır.
+# (Upstream Godot'ta bu global, build_gles2_headers içinde True yapılır.)
+gles2 = False
+
 
 class LegacyGLHeaderStruct:
     def __init__(self):
