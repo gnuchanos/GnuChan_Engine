@@ -1,0 +1,10 @@
+short_name = "gnuchanide"
+name = "GnuChanIDE"
+major = 0
+minor = 1
+patch = 0
+status = "stable"
+module_config = ""
+year = 2026
+website = "https://gnuchan.org"
+docs = "0.1"
