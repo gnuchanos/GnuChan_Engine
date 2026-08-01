@@ -168,11 +168,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="android/modules" type="String" setter="" getter="" default="&quot;&quot;">
-			Comma-separated list of custom Android modules (which must have been built in the Android export templates) using their Java package path, e.g. [code]"org/godotengine/godot/MyCustomSingleton,com/example/foo/FrenchFriesFactory"[/code].
-			[b]Note:[/b] Since Godot 3.2.2, the [code]org/godotengine/godot/GodotPaymentV3[/code] module was deprecated and replaced by the [code]GodotPayment[/code] plugin which should be enabled in the Android export preset under [code]Plugins[/code] section. The singleton to access in code was also renamed to [code]GodotPayment[/code].
-		</member>
-		<member name="application/boot_splash/bg_color" type="Color" setter="" getter="" default="Color( 0.14, 0.14, 0.14, 1 )">
+	<member name="application/boot_splash/bg_color" type="Color" setter="" getter="" default="Color( 0.14, 0.14, 0.14, 1 )">
 			Background color for the boot splash.
 		</member>
 		<member name="application/boot_splash/fullsize" type="bool" setter="" getter="" default="true">
@@ -1551,18 +1547,8 @@
 		</member>
 		<member name="rendering/environment/default_environment" type="String" setter="" getter="" default="&quot;&quot;">
 			[Environment] that will be used as a fallback environment in case a scene does not specify its own environment. The default environment is loaded in at scene load time regardless of whether you have set an environment or not. If you do not rely on the fallback environment, it is best to delete [code]default_env.tres[/code], or to specify a different default environment here.
-		</member>
-		<member name="rendering/gles2/compatibility/disable_half_float" type="bool" setter="" getter="" default="false">
-			The use of half-float vertex compression may be producing rendering errors on some platforms (especially iOS). These have been seen particularly in particles. Disabling half-float may resolve these problems.
-		</member>
-		<member name="rendering/gles2/compatibility/disable_half_float.iOS" type="bool" setter="" getter="" default="true">
-			iOS specific override for [member rendering/gles2/compatibility/disable_half_float], due to poor support for half-float vertex compression on many devices.
-		</member>
-		<member name="rendering/gles2/compatibility/enable_high_float.Android" type="bool" setter="" getter="" default="false">
-			If [code]true[/code] and available on the target Android device, enables high floating point precision for all shader computations in GLES2.
-			[b]Warning:[/b] High floating point precision can be extremely slow on older devices and is often not available at all. Use with caution.
-		</member>
-		<member name="rendering/gles3/shaders/log_active_async_compiles_count" type="bool" setter="" getter="" default="false">
+	</member>
+	<member name="rendering/gles3/shaders/log_active_async_compiles_count" type="bool" setter="" getter="" default="false">
 			If [code]true[/code], every time an asynchronous shader compilation or an asynchronous shader reconstruction from cache starts or finishes, a line will be logged telling how many of those are happening.
 			If the platform doesn't support parallel shader compile, but only the compile queue via a secondary GL context, what the message will tell is the number of shader compiles currently queued.
 			[b]Note:[/b] This setting is only meaningful if [code]rendering/gles3/shaders/shader_compilation_mode[/code] is [b]not[/b] [code]Synchronous[/code].
@@ -1573,31 +1559,12 @@
 			This is a way to balance the CPU work between running the game and compiling the shaders. The goal is to have as many asynchronous compiles in flight as possible without impacting the responsiveness of the game, which beyond some point would destroy the benefits of asynchronous compilation. In other words, you may be able to afford that the FPS lowers a bit, and that will already be better than the stalling that synchronous compilation could cause.
 			The default value is a conservative one, so you are advised to tweak it according to the hardware you are targeting.
 			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is [b]not[/b] [code]Synchronous[/code].
-		</member>
-		<member name="rendering/gles3/shaders/max_simultaneous_compiles.mobile" type="int" setter="" getter="" default="1">
-			The default is a very conservative override for [member rendering/gles3/shaders/max_simultaneous_compiles].
-			Depending on the specific devices you are targeting, you may want to raise it.
-			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is [b]not[/b] [code]Synchronous[/code].
-		</member>
-		<member name="rendering/gles3/shaders/max_simultaneous_compiles.web" type="int" setter="" getter="" default="1">
-			The default is a very conservative override for [member rendering/gles3/shaders/max_simultaneous_compiles].
-			Depending on the specific browsers you are targeting, you may want to raise it.
-			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is [b]not[/b] [code]Synchronous[/code].
-		</member>
-		<member name="rendering/gles3/shaders/shader_cache_size_mb" type="int" setter="" getter="" default="512">
+	</member>
+	<member name="rendering/gles3/shaders/shader_cache_size_mb" type="int" setter="" getter="" default="512">
 			The maximum size, in megabytes, that the ubershader cache can grow up to. On startup, the least recently used entries will be deleted until the total size is within bounds.
 			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is set to [code]Asynchronous + Cache[/code].
-		</member>
-		<member name="rendering/gles3/shaders/shader_cache_size_mb.mobile" type="int" setter="" getter="" default="128">
-			An override for [member rendering/gles3/shaders/shader_cache_size_mb], so a smaller maximum size can be configured for mobile platforms, where storage space is more limited.
-			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is set to [code]Asynchronous + Cache[/code].
-		</member>
-		<member name="rendering/gles3/shaders/shader_cache_size_mb.web" type="int" setter="" getter="" default="128">
-			An override for [member rendering/gles3/shaders/shader_cache_size_mb], so a smaller maximum size can be configured for web platforms, where storage space is more limited.
-			[b]Note:[/b] Currently, shader caching is generally unavailable on web platforms.
-			[b]Note:[/b] This setting is only meaningful if [member rendering/gles3/shaders/shader_compilation_mode] is set to [code]Asynchronous + Cache[/code].
-		</member>
-		<member name="rendering/gles3/shaders/shader_compilation_mode" type="int" setter="" getter="" default="0">
+	</member>
+	<member name="rendering/gles3/shaders/shader_compilation_mode" type="int" setter="" getter="" default="0">
 			If set to [code]Asynchronous[/code] and available on the target device, asynchronous compilation of shaders is enabled (in contrast to [code]Asynchronous[/code]).
 			That means that when a shader is first used under some new rendering situation, the game won't stall while such shader is being compiled. Instead, a fallback will be used and the real shader will be compiled in the background. Once the actual shader is compiled, it will be used the next times it's used to draw a frame.
 			Depending on the [member Material3D.async_mode] mode configured for a given material, the fallback will be an "ubershader" (the default) or just skip rendering any item it is applied to. In custom [ShaderMaterial]s, the async mode is set using [code]render_mode async_visible;[/code] (default) or [code]render_mode async_hidden;[/code] at the top of the shader.
@@ -1605,16 +1572,8 @@
 			To reduce loading times after the project has been launched at least once, you can use [code]Asynchronous + Cache[/code]. This also causes the ubershaders to be cached into storage so they can be ready faster next time they are used (provided the platform provides support for it).
 			[b]Note:[/b] Asynchronous compilation requires driver support for the [code]GL_ARB_get_program_binary[/code] OpenGL extension. This extension is supported by all hardware that supports OpenGL 4.1 or higher as well as most hardware that supports OpenGL 3.3 or higher.
 			[b]Note:[/b] Asynchronous compilation is currently only supported for spatial (3D) and particle materials/shaders. CanvasItem (2D) shaders will not use asynchronous compilation even if this setting is set to [code]Asynchronous[/code] or [code]Asynchronous + Cache[/code].
-		</member>
-		<member name="rendering/gles3/shaders/shader_compilation_mode.mobile" type="int" setter="" getter="" default="0">
-			An override for [member rendering/gles3/shaders/shader_compilation_mode], so asynchronous compilation can be disabled on mobile platforms.
-			You may want to do that since mobile GPUs generally won't support ubershaders due to their complexity.
-		</member>
-		<member name="rendering/gles3/shaders/shader_compilation_mode.web" type="int" setter="" getter="" default="0">
-			An override for [member rendering/gles3/shaders/shader_compilation_mode], so asynchronous compilation can be disabled on web platforms.
-			You may want to do that since certain browsers (especially on mobile platforms) generally won't support ubershaders due to their complexity.
-		</member>
-		<member name="rendering/limits/buffers/blend_shape_max_buffer_size_kb" type="int" setter="" getter="" default="4096">
+	</member>
+	<member name="rendering/limits/buffers/blend_shape_max_buffer_size_kb" type="int" setter="" getter="" default="4096">
 			Max buffer size for blend shapes. Any blend shape bigger than this will not work.
 		</member>
 		<member name="rendering/limits/buffers/canvas_polygon_buffer_size_kb" type="int" setter="" getter="" default="128">
