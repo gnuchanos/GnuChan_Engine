@@ -2,6 +2,10 @@ def can_build(env, platform):
     return True
 
 
+def is_enabled():
+    return False
+
+
 def configure(env):
     pass
 

@@ -2,30 +2,34 @@
 /*  ray_cast.cpp                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             GNUCHANIDE ENGINE                          */
+/*                        https://github.com/gnuchanos                    */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
-/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*  RayCast 3D:                                                          */
+/*    - Query: is_colliding / get_collision_point / get_collision_normal */
+/*    - Target info: body_name() / body_group() / get_collider()         */
+/*    - Ignoring: skip(node) / skip_group(group)                         */
+/*    - Settings: enabled / cast_to / length                             */
+/*    - Editor debug visuals (used by spatial_editor_gizmos)             */
 /*                                                                        */
-/* Permission is hereby granted, free of charge, to any person obtaining  */
-/* a copy of this software and associated documentation files (the        */
-/* "Software"), to deal in the Software without restriction, including    */
-/* without limitation the rights to use, copy, modify, merge, publish,    */
-/* distribute, sublicense, and/or sell copies of the Software, and to     */
-/* permit persons to whom the Software is furnished to do so, subject to  */
-/* the following conditions:                                              */
+/*  Permission is hereby granted, free of charge, to any person obtaining */
+/*  a copy of this software and associated documentation files (the       */
+/*  "Software"), to deal in the Software without restriction, including   */
+/*  without limitation the rights to use, copy, modify, merge, publish,   */
+/*  distribute, sublicense, and/or sell copies of the Software, and to    */
+/*  permit persons to whom the Software is furnished to do so, subject to */
+/*  the following conditions:                                             */
 /*                                                                        */
-/* The above copyright notice and this permission notice shall be         */
-/* included in all copies or substantial portions of the Software.        */
+/*  The above copyright notice and this permission notice shall be        */
+/*  included in all copies or substantial portions of the Software.       */
 /*                                                                        */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/*  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/*  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/*  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/*  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/*  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/*  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /**************************************************************************/
 
 #include "ray_cast.h"
@@ -33,69 +37,134 @@
 #include "collision_object.h"
 #include "core/engine.h"
 #include "mesh_instance.h"
+#include "scene/main/viewport.h"
 #include "servers/physics_server.h"
 
-void RayCast::set_cast_to(const Vector3 &p_point) {
-	cast_to = p_point;
-	update_gizmo();
-
-	if (Engine::get_singleton()->is_editor_hint()) {
-		if (is_inside_tree()) {
-			_update_debug_shape_vertices();
-		}
-	} else if (debug_shape) {
-		_update_debug_shape();
-	}
-}
-
-Vector3 RayCast::get_cast_to() const {
-	return cast_to;
-}
-
-void RayCast::set_collision_mask(uint32_t p_mask) {
-	collision_mask = p_mask;
-}
-
-uint32_t RayCast::get_collision_mask() const {
-	return collision_mask;
-}
-
-void RayCast::set_collision_mask_bit(int p_bit, bool p_value) {
-	ERR_FAIL_INDEX_MSG(p_bit, 32, "Collision mask bit must be between 0 and 31 inclusive.");
-	uint32_t mask = get_collision_mask();
-	if (p_value) {
-		mask |= 1 << p_bit;
-	} else {
-		mask &= ~(1 << p_bit);
-	}
-	set_collision_mask(mask);
-}
-
-bool RayCast::get_collision_mask_bit(int p_bit) const {
-	ERR_FAIL_INDEX_V_MSG(p_bit, 32, false, "Collision mask bit must be between 0 and 31 inclusive.");
-	return get_collision_mask() & (1 << p_bit);
-}
+/* ------------------------------------------------------------------ */
+/*  Query                                                              */
+/* ------------------------------------------------------------------ */
 
 bool RayCast::is_colliding() const {
 	return collided;
 }
+
 Object *RayCast::get_collider() const {
 	if (against == 0) {
 		return nullptr;
 	}
-
 	return ObjectDB::get_instance(against);
 }
 
-int RayCast::get_collider_shape() const {
-	return against_shape;
-}
 Vector3 RayCast::get_collision_point() const {
 	return collision_point;
 }
+
 Vector3 RayCast::get_collision_normal() const {
 	return collision_normal;
 }
+
+String RayCast::get_body_name() const {
+	const Object *collider = get_collider();
+	if (collider == nullptr) {
+		return String();
+	}
+	const Node *node = Object::cast_to<Node>(collider);
+	if (node == nullptr) {
+		return String();
+	}
+	return node->get_name();
+}
+
+String RayCast::get_body_group() const {
+	const Object *collider = get_collider();
+	if (collider == nullptr) {
+		return String();
+	}
+	const Node *node = Object::cast_to<Node>(collider);
+	if (node == nullptr) {
+		return String();
+	}
+	List<Node::GroupInfo> groups;
+	node->get_groups(&groups);
+	if (groups.size() == 0) {
+		return String();
+	}
+	return groups.front()->get().name;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Ignoring                                                           */
+/* ------------------------------------------------------------------ */
+
+void RayCast::skip(const Object *p_object) {
+	ERR_FAIL_NULL(p_object);
+
+	const Node *node = Object::cast_to<Node>(p_object);
+	ERR_FAIL_COND_MSG(node == nullptr, "The passed object must be a Node.");
+
+	/* Scan the node and its whole subtree, adding every physics body found
+	 * to the ray's exclude set. skip(self) works even when the caller is a
+	 * plain Spatial above the actual body. */
+	List<const Node *> pending;
+	pending.push_back(node);
+
+	while (!pending.empty()) {
+		const Node *current = pending.front()->get();
+		pending.pop_front();
+
+		const CollisionObject *co = Object::cast_to<CollisionObject>(current);
+		if (co != nullptr) {
+			exclude.insert(co->get_rid());
+		}
+
+		for (int i = 0; i < current->get_child_count(); i++) {
+			pending.push_back(current->get_child(i));
+		}
+	}
+}
+
+void RayCast::skip_group(const StringName &p_group) {
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	/* Godot 3 has no public API to list group members, so walk the whole
+	 * tree from the root, find nodes in the group via is_in_group(), and
+	 * add every physics body in their subtrees to the ray's exclude set. */
+	List<Node *> pending;
+	pending.push_back(Object::cast_to<Node>(get_tree()->get_root()));
+
+	while (!pending.empty()) {
+		Node *current = pending.front()->get();
+		pending.pop_front();
+
+		if (current->is_in_group(p_group)) {
+			List<const Node *> subtree;
+			subtree.push_back(current);
+			while (!subtree.empty()) {
+				const Node *n = subtree.front()->get();
+				subtree.pop_front();
+
+				const CollisionObject *co = Object::cast_to<CollisionObject>(n);
+				if (co != nullptr) {
+					exclude.insert(co->get_rid());
+				}
+
+				for (int i = 0; i < n->get_child_count(); i++) {
+					subtree.push_back(n->get_child(i));
+				}
+			}
+		}
+
+		for (int i = 0; i < current->get_child_count(); i++) {
+			pending.push_back(current->get_child(i));
+		}
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/*  Settings                                                           */
+/* ------------------------------------------------------------------ */
 
 void RayCast::set_enabled(bool p_enabled) {
 	enabled = p_enabled;
@@ -121,29 +190,55 @@ bool RayCast::is_enabled() const {
 	return enabled;
 }
 
-void RayCast::set_exclude_parent_body(bool p_exclude_parent_body) {
-	if (exclude_parent_body == p_exclude_parent_body) {
-		return;
-	}
+void RayCast::set_cast_to(const Vector3 &p_point) {
+	cast_to = p_point;
+	update_gizmo();
 
-	exclude_parent_body = p_exclude_parent_body;
-
-	if (!is_inside_tree()) {
-		return;
-	}
-
-	if (Object::cast_to<CollisionObject>(get_parent())) {
-		if (exclude_parent_body) {
-			exclude.insert(Object::cast_to<CollisionObject>(get_parent())->get_rid());
-		} else {
-			exclude.erase(Object::cast_to<CollisionObject>(get_parent())->get_rid());
+	if (Engine::get_singleton()->is_editor_hint()) {
+		if (is_inside_tree()) {
+			_update_debug_shape_vertices();
 		}
+	} else if (debug_shape) {
+		_update_debug_shape();
 	}
 }
 
-bool RayCast::get_exclude_parent_body() const {
-	return exclude_parent_body;
+Vector3 RayCast::get_cast_to() const {
+	return cast_to;
 }
+
+void RayCast::set_length(real_t p_length) {
+	cast_to.z = -p_length;
+	set_cast_to(cast_to);
+}
+
+real_t RayCast::get_length() const {
+	return -cast_to.z;
+}
+
+void RayCast::set_collide_with_bodies(bool p_clip) {
+	collide_with_bodies = p_clip;
+}
+
+bool RayCast::is_collide_with_bodies_enabled() const {
+	return collide_with_bodies;
+}
+
+void RayCast::set_collide_with_areas(bool p_clip) {
+	collide_with_areas = p_clip;
+}
+
+bool RayCast::is_collide_with_areas_enabled() const {
+	return collide_with_areas;
+}
+
+void RayCast::force_raycast_update() {
+	_update_raycast_state();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Internal                                                           */
+/* ------------------------------------------------------------------ */
 
 void RayCast::_notification(int p_what) {
 	switch (p_what) {
@@ -160,15 +255,6 @@ void RayCast::_notification(int p_what) {
 			if (get_tree()->is_debugging_collisions_hint()) {
 				_update_debug_shape();
 			}
-
-			if (Object::cast_to<CollisionObject>(get_parent())) {
-				if (exclude_parent_body) {
-					exclude.insert(Object::cast_to<CollisionObject>(get_parent())->get_rid());
-				} else {
-					exclude.erase(Object::cast_to<CollisionObject>(get_parent())->get_rid());
-				}
-			}
-
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 			if (enabled) {
@@ -178,7 +264,6 @@ void RayCast::_notification(int p_what) {
 			if (debug_shape) {
 				_clear_debug_shape();
 			}
-
 		} break;
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			if (!enabled) {
@@ -190,7 +275,6 @@ void RayCast::_notification(int p_what) {
 			if (prev_collision_state != collided && get_tree()->is_debugging_collisions_hint()) {
 				_update_debug_shape_material(true);
 			}
-
 		} break;
 	}
 }
@@ -206,134 +290,27 @@ void RayCast::_update_raycast_state() {
 
 	Vector3 to = cast_to;
 	if (to == Vector3()) {
-		to = Vector3(0, 0.01, 0);
+		to = Vector3(0, 0, -1);
 	}
 
 	PhysicsDirectSpaceState::RayResult rr;
 
-	if (dss->intersect_ray(gt.get_origin(), gt.xform(to), rr, exclude, collision_mask, collide_with_bodies, collide_with_areas)) {
+	/* Collision mask is intentionally full (0xFFFFFFFF): instead of fiddling
+	 * with per-object layer/mask bits, use skip() / skip_group() to ignore. */
+	if (dss->intersect_ray(gt.get_origin(), gt.xform(to), rr, exclude, 0xFFFFFFFF, collide_with_bodies, collide_with_areas)) {
 		collided = true;
 		against = rr.collider_id;
 		collision_point = rr.position;
 		collision_normal = rr.normal;
-		against_shape = rr.shape;
 	} else {
 		collided = false;
 		against = 0;
-		against_shape = 0;
 	}
 }
 
-void RayCast::force_raycast_update() {
-	_update_raycast_state();
-}
-
-void RayCast::add_exception_rid(const RID &p_rid) {
-	exclude.insert(p_rid);
-}
-
-void RayCast::add_exception(const Object *p_object) {
-	ERR_FAIL_NULL(p_object);
-	const CollisionObject *co = Object::cast_to<CollisionObject>(p_object);
-	ERR_FAIL_COND_MSG(!co, "The passed Node must be an instance of CollisionObject.");
-	add_exception_rid(co->get_rid());
-}
-
-void RayCast::remove_exception_rid(const RID &p_rid) {
-	exclude.erase(p_rid);
-}
-
-void RayCast::remove_exception(const Object *p_object) {
-	ERR_FAIL_NULL(p_object);
-	const CollisionObject *co = Object::cast_to<CollisionObject>(p_object);
-	ERR_FAIL_COND_MSG(!co, "The passed Node must be an instance of CollisionObject.");
-	remove_exception_rid(co->get_rid());
-}
-
-void RayCast::clear_exceptions() {
-	exclude.clear();
-
-	if (exclude_parent_body && is_inside_tree()) {
-		CollisionObject *parent = Object::cast_to<CollisionObject>(get_parent());
-		if (parent) {
-			exclude.insert(parent->get_rid());
-		}
-	}
-}
-
-void RayCast::set_collide_with_areas(bool p_clip) {
-	collide_with_areas = p_clip;
-}
-
-bool RayCast::is_collide_with_areas_enabled() const {
-	return collide_with_areas;
-}
-
-void RayCast::set_collide_with_bodies(bool p_clip) {
-	collide_with_bodies = p_clip;
-}
-
-bool RayCast::is_collide_with_bodies_enabled() const {
-	return collide_with_bodies;
-}
-
-void RayCast::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &RayCast::set_enabled);
-	ClassDB::bind_method(D_METHOD("is_enabled"), &RayCast::is_enabled);
-
-	ClassDB::bind_method(D_METHOD("set_cast_to", "local_point"), &RayCast::set_cast_to);
-	ClassDB::bind_method(D_METHOD("get_cast_to"), &RayCast::get_cast_to);
-
-	ClassDB::bind_method(D_METHOD("is_colliding"), &RayCast::is_colliding);
-	ClassDB::bind_method(D_METHOD("force_raycast_update"), &RayCast::force_raycast_update);
-
-	ClassDB::bind_method(D_METHOD("get_collider"), &RayCast::get_collider);
-	ClassDB::bind_method(D_METHOD("get_collider_shape"), &RayCast::get_collider_shape);
-	ClassDB::bind_method(D_METHOD("get_collision_point"), &RayCast::get_collision_point);
-	ClassDB::bind_method(D_METHOD("get_collision_normal"), &RayCast::get_collision_normal);
-
-	ClassDB::bind_method(D_METHOD("add_exception_rid", "rid"), &RayCast::add_exception_rid);
-	ClassDB::bind_method(D_METHOD("add_exception", "node"), &RayCast::add_exception);
-
-	ClassDB::bind_method(D_METHOD("remove_exception_rid", "rid"), &RayCast::remove_exception_rid);
-	ClassDB::bind_method(D_METHOD("remove_exception", "node"), &RayCast::remove_exception);
-
-	ClassDB::bind_method(D_METHOD("clear_exceptions"), &RayCast::clear_exceptions);
-
-	ClassDB::bind_method(D_METHOD("set_collision_mask", "mask"), &RayCast::set_collision_mask);
-	ClassDB::bind_method(D_METHOD("get_collision_mask"), &RayCast::get_collision_mask);
-
-	ClassDB::bind_method(D_METHOD("set_collision_mask_bit", "bit", "value"), &RayCast::set_collision_mask_bit);
-	ClassDB::bind_method(D_METHOD("get_collision_mask_bit", "bit"), &RayCast::get_collision_mask_bit);
-
-	ClassDB::bind_method(D_METHOD("set_exclude_parent_body", "mask"), &RayCast::set_exclude_parent_body);
-	ClassDB::bind_method(D_METHOD("get_exclude_parent_body"), &RayCast::get_exclude_parent_body);
-
-	ClassDB::bind_method(D_METHOD("set_collide_with_areas", "enable"), &RayCast::set_collide_with_areas);
-	ClassDB::bind_method(D_METHOD("is_collide_with_areas_enabled"), &RayCast::is_collide_with_areas_enabled);
-
-	ClassDB::bind_method(D_METHOD("set_collide_with_bodies", "enable"), &RayCast::set_collide_with_bodies);
-	ClassDB::bind_method(D_METHOD("is_collide_with_bodies_enabled"), &RayCast::is_collide_with_bodies_enabled);
-
-	ClassDB::bind_method(D_METHOD("set_debug_shape_custom_color", "debug_shape_custom_color"), &RayCast::set_debug_shape_custom_color);
-	ClassDB::bind_method(D_METHOD("get_debug_shape_custom_color"), &RayCast::get_debug_shape_custom_color);
-
-	ClassDB::bind_method(D_METHOD("set_debug_shape_thickness", "debug_shape_thickness"), &RayCast::set_debug_shape_thickness);
-	ClassDB::bind_method(D_METHOD("get_debug_shape_thickness"), &RayCast::get_debug_shape_thickness);
-
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "exclude_parent"), "set_exclude_parent_body", "get_exclude_parent_body");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "cast_to"), "set_cast_to", "get_cast_to");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_mask", "get_collision_mask");
-
-	ADD_GROUP("Collide With", "collide_with");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_areas", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collide_with_areas", "is_collide_with_areas_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_bodies", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collide_with_bodies", "is_collide_with_bodies_enabled");
-
-	ADD_GROUP("Debug Shape", "debug_shape");
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "debug_shape_custom_color"), "set_debug_shape_custom_color", "get_debug_shape_custom_color");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "debug_shape_thickness", PROPERTY_HINT_RANGE, "1,5"), "set_debug_shape_thickness", "get_debug_shape_thickness");
-}
+/* ------------------------------------------------------------------ */
+/*  Editor debug visuals (used by spatial_editor_gizmos)               */
+/* ------------------------------------------------------------------ */
 
 int RayCast::get_debug_shape_thickness() const {
 	return debug_shape_thickness;
@@ -505,15 +482,63 @@ void RayCast::_clear_debug_shape() {
 	debug_shape = nullptr;
 }
 
+void RayCast::_bind_methods() {
+	/* Query */
+	ClassDB::bind_method(D_METHOD("is_colliding"), &RayCast::is_colliding);
+	ClassDB::bind_method(D_METHOD("get_collider"), &RayCast::get_collider);
+	ClassDB::bind_method(D_METHOD("get_collision_point"), &RayCast::get_collision_point);
+	ClassDB::bind_method(D_METHOD("get_collision_normal"), &RayCast::get_collision_normal);
+
+	ClassDB::bind_method(D_METHOD("body_name"), &RayCast::get_body_name);
+	ClassDB::bind_method(D_METHOD("body_group"), &RayCast::get_body_group);
+
+	/* Ignoring */
+	ClassDB::bind_method(D_METHOD("skip", "node"), &RayCast::skip);
+	ClassDB::bind_method(D_METHOD("skip_group", "group"), &RayCast::skip_group);
+
+	/* Settings */
+	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &RayCast::set_enabled);
+	ClassDB::bind_method(D_METHOD("is_enabled"), &RayCast::is_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_cast_to", "local_point"), &RayCast::set_cast_to);
+	ClassDB::bind_method(D_METHOD("get_cast_to"), &RayCast::get_cast_to);
+
+	ClassDB::bind_method(D_METHOD("set_length", "length"), &RayCast::set_length);
+	ClassDB::bind_method(D_METHOD("get_length"), &RayCast::get_length);
+
+	ClassDB::bind_method(D_METHOD("set_collide_with_areas", "enable"), &RayCast::set_collide_with_areas);
+	ClassDB::bind_method(D_METHOD("is_collide_with_areas_enabled"), &RayCast::is_collide_with_areas_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_collide_with_bodies", "enable"), &RayCast::set_collide_with_bodies);
+	ClassDB::bind_method(D_METHOD("is_collide_with_bodies_enabled"), &RayCast::is_collide_with_bodies_enabled);
+
+	ClassDB::bind_method(D_METHOD("force_raycast_update"), &RayCast::force_raycast_update);
+
+	/* Editor debug visuals */
+	ClassDB::bind_method(D_METHOD("set_debug_shape_custom_color", "debug_shape_custom_color"), &RayCast::set_debug_shape_custom_color);
+	ClassDB::bind_method(D_METHOD("get_debug_shape_custom_color"), &RayCast::get_debug_shape_custom_color);
+	ClassDB::bind_method(D_METHOD("set_debug_shape_thickness", "debug_shape_thickness"), &RayCast::set_debug_shape_thickness);
+	ClassDB::bind_method(D_METHOD("get_debug_shape_thickness"), &RayCast::get_debug_shape_thickness);
+
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "cast_to"), "set_cast_to", "get_cast_to");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "length"), "set_length", "get_length");
+
+	ADD_GROUP("Collide With", "collide_with");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_areas"), "set_collide_with_areas", "is_collide_with_areas_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_bodies"), "set_collide_with_bodies", "is_collide_with_bodies_enabled");
+
+	ADD_GROUP("Debug Shape", "debug_shape");
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "debug_shape_custom_color"), "set_debug_shape_custom_color", "get_debug_shape_custom_color");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "debug_shape_thickness", PROPERTY_HINT_RANGE, "1,5"), "set_debug_shape_thickness", "get_debug_shape_thickness");
+}
+
 RayCast::RayCast() {
 	enabled = false;
 	against = 0;
 	collided = false;
-	against_shape = 0;
-	collision_mask = 1;
-	cast_to = Vector3(0, -1, 0);
+	cast_to = Vector3(0, 0, -3);
 	debug_shape = nullptr;
-	exclude_parent_body = true;
-	collide_with_areas = false;
 	collide_with_bodies = true;
+	collide_with_areas = false;
 }

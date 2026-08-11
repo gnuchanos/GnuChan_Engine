@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RayCast 3D — GnuChanIDE Dokümantasyonu</title>
+<style>
+	:root {
+		--bg: #14061f;
+		--panel: #1d0b2e;
+		--panel2: #260f3d;
+		--border: #3b1e5c;
+		--accent: #a855f7;
+		--accent2: #7c3aed;
+		--accent3: #d8b4fe;
+		--text: #e9d5ff;
+		--muted: #9d83b8;
+		--good: #34d399;
+		--warn: #fbbf24;
+		--bad: #f87171;
+		--codebg: #0d0516;
+	}
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	body {
+		background: var(--bg);
+		color: var(--text);
+		font-family: "Segoe UI", system-ui, sans-serif;
+		line-height: 1.6;
+		padding-bottom: 60px;
+	}
+	header {
+		background: linear-gradient(135deg, var(--accent2), var(--accent));
+		padding: 32px 24px;
+		text-align: center;
+		border-bottom: 4px solid var(--accent3);
+	}
+	header h1 { font-size: 2rem; letter-spacing: 0.5px; }
+	header p { margin-top: 6px; color: #f3e8ff; opacity: 0.95; }
+	.wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+
+	.toolbar {
+		position: sticky; top: 0; z-index: 10;
+		background: rgba(20, 6, 31, 0.95);
+		backdrop-filter: blur(6px);
+		border-bottom: 1px solid var(--border);
+		padding: 12px 0;
+	}
+	.toolbar .wrap { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+	#search {
+		flex: 1; min-width: 200px;
+		background: var(--panel); color: var(--text);
+		border: 1px solid var(--border); border-radius: 8px;
+		padding: 10px 14px; font-size: 0.95rem; outline: none;
+	}
+	#search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(168,85,247,0.25); }
+	.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+	.filters button {
+		background: var(--panel2); color: var(--accent3);
+		border: 1px solid var(--border); border-radius: 20px;
+		padding: 6px 14px; cursor: pointer; font-size: 0.85rem;
+		transition: all 0.15s;
+	}
+	.filters button.active, .filters button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+	#count { margin-left: auto; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+
+	.quick-copy {
+		background: var(--panel); border: 1px solid var(--border);
+		border-left: 4px solid var(--accent);
+		border-radius: 10px; padding: 16px 20px; margin: 28px 0 10px;
+	}
+	.quick-copy h2 { font-size: 1.05rem; margin-bottom: 8px; color: var(--accent3); }
+	.quick-copy p { color: var(--text); font-size: 0.95rem; }
+	.quick-copy code { background: var(--codebg); padding: 2px 6px; border-radius: 5px; color: var(--accent3); }
+
+	.group { margin: 30px 0; }
+	.group > h2 {
+		font-size: 1.25rem; color: var(--accent3);
+		border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px;
+	}
+	.card {
+		background: var(--panel);
+		border: 1px solid var(--border); border-radius: 12px;
+		padding: 18px 20px; margin-bottom: 14px;
+		transition: border-color 0.15s;
+	}
+	.card:hover { border-color: var(--accent); }
+	.card .sig {
+		font-family: Consolas, "Courier New", monospace;
+		background: var(--codebg);
+		color: var(--accent3); border-radius: 8px;
+		padding: 10px 14px; font-size: 0.95rem;
+		display: flex; justify-content: space-between; gap: 10px; align-items: center;
+		overflow-x: auto;
+	}
+	.card .sig .kind { color: var(--warn); margin-right: 8px; }
+	.card .desc { margin-top: 10px; color: var(--text); font-size: 0.95rem; }
+	.card .args { margin-top: 8px; font-size: 0.88rem; color: var(--muted); }
+	.card .args span { color: var(--accent3); }
+	.tag {
+		display: inline-block; font-size: 0.72rem; border-radius: 12px;
+		padding: 2px 10px; margin-left: 8px; vertical-align: middle;
+		font-weight: 600; letter-spacing: 0.3px;
+	}
+	.tag.new { background: rgba(52,211,153,0.15); color: var(--good); border: 1px solid rgba(52,211,153,0.4); }
+	.tag.core { background: rgba(251,191,36,0.12); color: var(--warn); border: 1px solid rgba(251,191,36,0.35); }
+	.copy {
+		background: transparent; border: 1px solid var(--border); color: var(--muted);
+		border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 0.75rem;
+		flex-shrink: 0; transition: all 0.15s;
+	}
+	.copy:hover { color: #fff; border-color: var(--accent); background: var(--accent2); }
+	.example {
+		margin-top: 10px; background: var(--codebg);
+		border: 1px solid var(--border); border-radius: 8px;
+		padding: 12px 16px; overflow-x: auto;
+	}
+	.example pre { font-family: Consolas, "Courier New", monospace; font-size: 0.88rem; color: var(--text); white-space: pre; }
+	.example .cmt { color: var(--muted); }
+	.example .key { color: var(--accent3); }
+	.hidden { display: none !important; }
+	.note {
+		background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.3);
+		border-radius: 10px; padding: 12px 16px; margin: 18px 0; font-size: 0.92rem;
+	}
+	.note b { color: var(--warn); }
+	footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 50px; }
+</style>
+</head>
+<body>
+
+<header>
+	<h1>⚡ RayCast 3D</h1>
+	<p>GnuChanIDE — 3D fizik sahnesinde çizgi sorgusu: tüm API, Türkçe açıklamalarıyla</p>
+</header>
+
+<div class="toolbar">
+	<div class="wrap">
+		<input id="search" type="text" placeholder="Ara: is_colliding, skip, skip_group, body_name, length...">
+		<div class="filters">
+			<button data-f="all" class="active">Tümü</button>
+			<button data-f="sorgu">Sorgu</button>
+			<button data-f="atla">Atla / Hariç Tut</button>
+			<button data-f="ayar">Ayarlar</button>
+			<button data-f="debug">Debug</button>
+			<button data-f="yeni">Yeni (GnuChan)</button>
+		</div>
+		<span id="count"></span>
+	</div>
+</div>
+
+<div class="wrap">
+
+	<div class="quick-copy">
+		<h2>📋 Hızlı Referans</h2>
+		<p>RayCast, 3D fizik sahnesinde bir başlangıç noktasından <b>cast_to</b> bitiş noktasına uzanan
+		çizgiyi sorgular ve çizgiye değen <b>ilk fizik gövdesini</b> raporlar. Sonuç her fizik karesinde
+		otomatik güncellenir. Çizginin uzunluğu: <code>cast_to = Vector3(0, 0, -uzunluk)</code> veya
+		<code>length</code> özelliği. Bir gövdeyi/sahneyi sorgu dışı bırakmak için: <code>skip(self)</code>
+		veya <code>skip_group("duvar")</code>.</p>
+	</div>
+
+	<div class="note">
+		<b>Dikkat:</b> <code>skip()</code>, <code>skip_group()</code>, <code>body_name()</code>, <code>body_group()</code>, <code>length</code> — bu motorun RayCast'ine özel eklenen kolaylık fonksiyonlarıdır (orijinal Godot'ta yoktur).
+	</div>
+
+	<!-- ============================ SORGU ============================ -->
+	<div class="group">
+		<h2>🔍 Sorgu — Çizgi Ne ile Kesişiyor?</h2>
+
+		<div class="card" data-c="sorgu">
+			<div class="sig"><span><span class="kind">func</span> is_colliding() -> bool</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="is_colliding()">Kopyala</button></div>
+			<div class="desc">Sorgu çizgisi şu anda bir fizik gövdesiyle kesişiyor mu? Temel kontrol. Sonuç her fizik karesinde otomatik güncellenir.</div>
+			<div class="example"><pre><span class="key">if</span> $Head/InteractionRay.is_colliding():
+	<span class="cmt"># kesişim var, hedefle işlem yap</span></pre></div>
+		</div>
+
+		<div class="card" data-c="sorgu">
+			<div class="sig"><span><span class="kind">func</span> get_collider() -> Object</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="get_collider()">Kopyala</button></div>
+			<div class="desc">Çizgiye değen <b>fizik gövdesi node'unun kendisini</b> döndürür. Dönüş tipi <code>Object</code>'tir ama pratikte sahnenizdeki gövde düğümüdür: <code>StaticBody</code>, <code>KinematicBody</code>, <code>RigidBody</code> veya <code>Area</code>. Kesişim yoksa <code>null</code> döner.</div>
+			<div class="desc">Bu Object, <b>herhangi bir Node gibi</b> davranır; yani üzerinde şunları yapabilirsin:</div>
+			<div class="args"><span>ad / tip:</span> <code>get_name()</code>, <code>get_class()</code>, <code>is_in_group("kapi")</code><br>
+			<span>etiket/metadata:</span> <code>get_meta("kapi_anahtari")</code> — editörde node'a "Meta" olarak yazdığın değerler<br>
+			<span>script'e erişim:</span> <code>hedef.get("can")</code> veya <code>hedef.call("ac")</code> — gövde üzerindeki GDScript değişken/metotları<br>
+			<span>ağaç işlemleri:</span> <code>get_parent()</code>, <code>get_node("CollisionShape")</code>, <code>queue_free()</code>, <code>set_visible(false)</code></div>
+			<div class="example"><pre><span class="key">var</span> hedef = $Head/InteractionRay.get_collider()
+<span class="key">if</span> hedef != <span class="key">null</span>:
+	<span class="cmt"># 1) Türünü ve adını öğren</span>
+	print(hedef.get_class(), " -> ", hedef.get_name())   <span class="cmt"># StaticBody -> "Kapi1"</span>
+
+	<span class="cmt"># 2) Grupta mı kontrol et</span>
+	<span class="key">if</span> hedef.is_in_group(<span class="key">"kapi"</span>):
+		hedef.call(<span class="key">"ac"</span>)          <span class="cmt"># gövdedeki script fonksiyonu</span>
+
+	<span class="cmt"># 3) Meta'ya göre karar ver (editörde "Meta" alanına yazılır)</span>
+	<span class="key">if</span> hedef.has_meta(<span class="key">"kilitli"</span>):
+		<span class="key">return</span>  <span class="cmt"># kilitli kapı açılmaz</span></pre></div>
+		</div>
+
+		<div class="card" data-c="sorgu">
+			<div class="sig"><span><span class="kind">func</span> get_collision_point() -> Vector3</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="get_collision_point()">Kopyala</button></div>
+			<div class="desc">Çizginin gövdeye değdiği nokta (küresel koordinat). Çarpma izi, patlama efekti veya işaretçi yerleştirmek için kullanılır.</div>
+			<div class="example"><pre><span class="cmt"># çarpma noktasına bir nesne yerleştir</span>
+<span class="key">var</span> nokta = $Head/InteractionRay.get_collision_point()</pre></div>
+		</div>
+
+		<div class="card" data-c="sorgu">
+			<div class="sig"><span><span class="kind">func</span> get_collision_normal() -> Vector3</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="get_collision_normal()">Kopyala</button></div>
+			<div class="desc">Çarpma noktasındaki yüzeyin <b>normal vektörü</b> (yüzeye dik, gövdenin dışına bakan birim vektör). Yere serilen nesnenin dönüşünü hesaplamak, basamak/kuyu fiziği veya yüzeye hizalama yapmak için kullanılır.</div>
+		</div>
+
+		<div class="card" data-c="sorgu yeni">
+			<div class="sig"><span><span class="kind">func</span> body_name() -> String</span><span class="tag new">GnuChan Yeni</span><button class="copy" data-copy="body_name()">Kopyala</button></div>
+			<div class="desc">Çizgiye değen gövdenin node adını döndürür (ör. "Zemin", "Kapi"). Kesişim yoksa boş string.</div>
+			<div class="example"><pre>print($Head/InteractionRay.body_name())  <span class="cmt"># > "Zemin"</span></pre></div>
+		</div>
+
+		<div class="card" data-c="sorgu yeni">
+			<div class="sig"><span><span class="kind">func</span> body_group() -> String</span><span class="tag new">GnuChan Yeni</span><button class="copy" data-copy="body_group()">Kopyala</button></div>
+			<div class="desc">Çizgiye değen gövdenin ilk grubunun adını döndürür. Grup yoksa boş string.</div>
+			<div class="example"><pre><span class="key">if</span> $Head/InteractionRay.body_group() == <span class="key">"kapi"</span>:
+	<span class="cmt"># "kapi" grubundaki bir gövdeye değiyoruz</span></pre></div>
+		</div>
+	</div>
+
+	<!-- ============================ ATLA / HARİÇ TUT ============================ -->
+	<div class="group">
+		<h2>🚫 Atla / Hariç Tut — Sorgu Dışı Gövdeler</h2>
+
+		<div class="card" data-c="atla yeni">
+			<div class="sig"><span><span class="kind">func</span> skip(node: Node)</span><span class="tag new">GnuChan Yeni</span><button class="copy" data-copy="skip(node)">Kopyala</button></div>
+			<div class="desc">Verilen node'u ve <b>alt ağacındaki tüm fizik gövdelerini</b> sorgu dışı bırakır. Kendi karakterini sorgu dışı bırakmak için <code>_ready</code> içinde <code>skip(self)</code> yeterlidir — FPSController bunu otomatik yapar.</div>
+			<div class="example"><pre><span class="key">func</span> _ready():
+	$Head/InteractionRay.skip(self)          <span class="cmt"># kendi karakteri</span>
+	$Head/InteractionRay.skip($Kapilar/Kapi1) <span class="cmt"># herhangi bir obje</span></pre></div>
+		</div>
+
+		<div class="card" data-c="atla yeni">
+			<div class="sig"><span><span class="kind">func</span> skip_group(group: String)</span><span class="tag new">GnuChan Yeni</span><button class="copy" data-copy='skip_group("duvar")'>Kopyala</button></div>
+			<div class="desc">Bir <b>gruba üye tüm node'ların</b> alt ağacındaki fizik gövdelerini sorgu dışı bırakır. "duvar" grubunu tamamen atlamak tek satır. Çağrı, node ağaç içindeyken yapılmalıdır (<code>_ready</code> sonrası).</div>
+			<div class="example"><pre><span class="key">func</span> _ready():
+	$Head/InteractionRay.skip_group(<span class="key">"duvar"</span>)  <span class="cmt"># tüm "duvar" grubu</span></pre></div>
+		</div>
+	</div>
+
+	<!-- ============================ AYARLAR ============================ -->
+	<div class="group">
+		<h2>⚙️ Ayarlar — Sorgu Çizgisinin Geometrisi</h2>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">prop</span> cast_to: Vector3</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="cast_to = Vector3(0, 0, -5)">Kopyala</button></div>
+			<div class="desc">Çizginin <b>bitiş noktası</b> (yerel koordinat). <code>Vector3(0, 0, -5)</code> → -Z yönünde 5 birim uzunluğunda sorgu.</div>
+			<div class="example"><pre>$Head/InteractionRay.cast_to = Vector3(0, 0, <span class="key">-10</span>)  <span class="cmt"># 10 birim menzil</span></pre></div>
+		</div>
+
+		<div class="card" data-c="ayar yeni">
+			<div class="sig"><span><span class="kind">prop</span> length: float</span><span class="tag new">GnuChan Yeni</span><button class="copy" data-copy="length = 5">Kopyala</button></div>
+			<div class="desc">Çizgi uzunluğunu tek bir sayı ile ayarlar; <code>cast_to.z</code>'yi otomatik olarak <code>-length</code> yapar. <code>cast_to</code>'nun kısayoludur.</div>
+			<div class="example"><pre>$Head/InteractionRay.length = <span class="key">3.0</span>   <span class="cmt"># cast_to = (0, 0, -3)</span>
+print($Head/InteractionRay.length)   <span class="cmt"># > 3.0</span></pre></div>
+		</div>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">prop</span> enabled: bool</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="enabled = true">Kopyala</button></div>
+			<div class="desc">Sorgu açık/kapalı. Kapalıyken sonuç güncellenmez ve <code>is_colliding()</code> <code>false</code> döner.</div>
+		</div>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">prop</span> collide_with_bodies: bool</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="collide_with_bodies = true">Kopyala</button></div>
+			<div class="desc">Fizik gövdeleri (StaticBody, KinematicBody, RigidBody) sorguya dahil mi? Varsayılan açık.</div>
+		</div>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">prop</span> collide_with_areas: bool</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="collide_with_areas = true">Kopyala</button></div>
+			<div class="desc">Area'lar (tetikleyici bölgeler) sorguya dahil mi? Varsayılan kapalı.</div>
+		</div>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">func</span> force_raycast_update()</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="force_raycast_update()">Kopyala</button></div>
+			<div class="desc">Sorguyu <b>hemen</b> bir kez çalıştırır. Fizik karesini beklemeden (ör. aynı karede gövde taşıdıktan sonra) güncel sonuç almak için kullanılır.</div>
+		</div>
+
+		<div class="card" data-c="ayar">
+			<div class="sig"><span><span class="kind">note</span> collision_mask</span></div>
+			<div class="desc">GnuChan RayCast'inde katman maskesi sabit olarak <b>tümü</b> (0xFFFFFFFF) ayarlıdır. Gövdeleri dışlamak için maske yerine <code>skip()</code> / <code>skip_group()</code> kullanılır.</div>
+		</div>
+	</div>
+
+	<!-- ============================ DEBUG ============================ -->
+	<div class="group">
+		<h2>🧪 Debug — Çizgiyi Görselleştir</h2>
+
+		<div class="card" data-c="debug">
+			<div class="sig"><span><span class="kind">prop</span> debug_shape_custom_color: Color</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="debug_shape_custom_color = Color(1, 0, 0)">Kopyala</button></div>
+			<div class="desc">Editör'de çizginin görsel rengi. Varsayılan debug rengini kullanır; özelleştirmek için renk ver. (Oyun içinde görünmez.)</div>
+		</div>
+
+		<div class="card" data-c="debug">
+			<div class="sig"><span><span class="kind">prop</span> debug_shape_thickness: int</span><span class="tag core">Çekirdek</span><button class="copy" data-copy="debug_shape_thickness = 3">Kopyala</button></div>
+			<div class="desc">Çizginin görsel kalınlığı (1-5). Görünürlüğü artırmak için kullanılır.</div>
+		</div>
+	</div>
+
+	<footer>GnuChanIDE — RayCast 3D API referansı · Mor sürüm</footer>
+</div>
+
+<script>
+	const cards = Array.from(document.querySelectorAll('.card'));
+	const search = document.getElementById('search');
+	const countEl = document.getElementById('count');
+	const filterBtns = Array.from(document.querySelectorAll('.filters button'));
+
+	function apply() {
+		const q = search.value.toLowerCase().trim();
+		const f = filterBtns.find(b => b.classList.contains('active')).dataset.f;
+		let visible = 0;
+		cards.forEach(card => {
+			const text = card.textContent.toLowerCase();
+			const cats = (card.dataset.c || '').split(' ');
+			const okFilter = f === 'all' || cats.indexOf(f) !== -1;
+			const okSearch = q === '' || text.includes(q);
+			if (okFilter && okSearch) { card.classList.remove('hidden'); visible++; }
+			else { card.classList.add('hidden'); }
+		});
+		countEl.textContent = visible + ' / ' + cards.length;
+	}
+	search.addEventListener('input', apply);
+	filterBtns.forEach(b => b.addEventListener('click', () => {
+		filterBtns.forEach(x => x.classList.remove('active'));
+		b.classList.add('active');
+		apply();
+	}));
+
+	document.querySelectorAll('.copy').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const code = btn.dataset.copy;
+			navigator.clipboard.writeText(code).then(() => {
+				btn.textContent = '✓';
+				setTimeout(() => btn.textContent = 'Kopyala', 1200);
+			});
+		});
+	});
+	apply();
+</script>
+</body>
+</html>

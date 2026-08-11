@@ -1,0 +1,30 @@
+scons: Reading SConscript files ...
+Configuring for Windows: target=debug, bits=default
+Found MSVC version 14.3, arch amd64, bits=64
+Note: Building a debug binary (which will run slowly). Use `target=release_debug` to build an optimized release binary.
+Using custom build name: 'debug'.
+Checking for C header file mntent.h... (cached) no
+scons: done reading SConscript files.
+scons: Building targets ...
+Compiling ==> modules\gcl\gcl_script.cpp
+gcl_script.cpp
+progress_finish(["progress_finish"], [])
+Linking Static Library ==> modules\modules.lib
+thirdparty\recastnavigation\Recast\Source\Recast.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastAlloc.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastArea.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastAssert.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastContour.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastFilter.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastLayers.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastMesh.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastMeshDetail.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastRasterization.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+thirdparty\recastnavigation\Recast\Source\RecastRegion.windows.tools.64.obj : warning LNK4042: object specified more than once; extras ignored
+Linking Program        ==> bin\GnuChanIDE.exe
+   Creating library bin\GnuChanIDE.lib and object bin\GnuChanIDE.exp
+scons: done building targets.
+[Time elapsed: 00:00:19.427]
+[BUILD] GnuChanIDE 0.1.0-stable
+[BUILD] C:\Users\btw\AppData\Local\Python\pythoncore-3.14-64\python.exe -m SCons platform=windows module_bullet_enabled=no target=debug tools=yes -j8
+[BUILD] SUCCESS -> D:\GnuChan_Engine\src\bin\GnuChanIDE.exe

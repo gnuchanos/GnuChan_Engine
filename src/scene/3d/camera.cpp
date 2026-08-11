@@ -34,6 +34,8 @@
 #include "core/engine.h"
 #include "core/math/camera_matrix.h"
 #include "core/math/transform_interpolator.h"
+#include "core/node_reference.h"
+#include "scene/3d/physics_body.h"
 #include "scene/resources/material.h"
 #include "scene/resources/surface_tool.h"
 #include "servers/visual/visual_server_constants.h"
@@ -635,6 +637,105 @@ Camera::DopplerTracking Camera::get_doppler_tracking() const {
 	return doppler_tracking;
 }
 
+/* ------------------------------------------------------------------ */
+/*  GnuChan: simple pickup / drop helpers                              */
+/*  Script usage:                                                      */
+/*      $"Head/Camera".take = hedef     # pick up any Node             */
+/*      $"Head/Camera".drop = hand      # release what is being held   */
+/* ------------------------------------------------------------------ */
+
+void Camera::_release_held() {
+	held_node = nullptr;
+}
+
+void Camera::set_take(Object *p_object) {
+	if (p_object == nullptr) {
+		_release_held();
+		return;
+	}
+
+	/* If a NodeReference was passed, resolve the actual node from it. */
+	node_refferance *nref = Object::cast_to<node_refferance>(p_object);
+	if (nref != nullptr) {
+		p_object = nref->get_node();
+		if (p_object == nullptr) {
+			return;
+		}
+	}
+
+	Node *node = Object::cast_to<Node>(p_object);
+	ERR_FAIL_COND_MSG(node == nullptr, "Camera.take expects a Node.");
+
+	/* The hand can only hold one thing at a time. */
+	if (held_node != nullptr) {
+		set_drop(held_node);
+	}
+
+	if (is_inside_tree() && node->is_inside_tree() && node->get_parent() != this) {
+		/* Stop physics so the body can be carried. */
+		RigidBody *rb = Object::cast_to<RigidBody>(node);
+		if (rb != nullptr) {
+			rb->set_mode(RigidBody::MODE_STATIC);
+		}
+
+		Node *old_parent = node->get_parent();
+		if (old_parent != nullptr) {
+			old_parent->remove_child(node);
+		}
+		add_child(node);
+
+		/* Pin it in front of the camera. */
+		if (Object::cast_to<Spatial>(node) != nullptr) {
+			Object::cast_to<Spatial>(node)->set_transform(Transform(Basis(), Vector3(0, -0.5, -1.8)));
+		}
+	}
+
+	held_node = node;
+}
+
+Object *Camera::get_take() const {
+	return held_node;
+}
+
+void Camera::set_drop(Object *p_held) {
+	/* p_held is only a hint; always release whatever is being held. */
+	(void)p_held;
+	if (held_node == nullptr) {
+		return;
+	}
+
+	Node *node = held_node;
+	held_node = nullptr;
+
+	if (node->get_parent() == this) {
+		remove_child(node);
+	}
+
+	if (is_inside_tree()) {
+		/* Put it back into the scene, in front of the camera. */
+		get_tree()->get_root()->add_child(node);
+		Transform t = get_global_transform();
+		t.origin += -t.basis.get_axis(2) * 2.0;
+		if (t.origin.y < 0.5) {
+			t.origin.y = 0.5;
+		}
+		Spatial *sp = Object::cast_to<Spatial>(node);
+		if (sp != nullptr) {
+			sp->set_global_transform(t);
+		}
+	}
+
+	/* Re-enable physics. */
+	RigidBody *rb = Object::cast_to<RigidBody>(node);
+	if (rb != nullptr) {
+		rb->set_mode(RigidBody::MODE_RIGID);
+	}
+}
+
+Object *Camera::get_drop() const {
+	return held_node;
+}
+
 void Camera::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("project_ray_normal", "screen_point"), &Camera::project_ray_normal);
 	ClassDB::bind_method(D_METHOD("project_local_ray_normal", "screen_point"), &Camera::project_local_ray_normal);
@@ -698,6 +799,14 @@ void Camera::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "near", PROPERTY_HINT_EXP_RANGE, "0.01,8192,0.01,or_greater"), "set_znear", "get_znear");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "far", PROPERTY_HINT_EXP_RANGE, "0.1,8192,0.1,or_greater"), "set_zfar", "get_zfar");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "affect_lod"), "set_affect_lod", "get_affect_lod");
+
+	/* GnuChan: pickup / drop helpers */
+	ClassDB::bind_method(D_METHOD("set_take", "object"), &Camera::set_take);
+	ClassDB::bind_method(D_METHOD("get_take"), &Camera::get_take);
+	ClassDB::bind_method(D_METHOD("set_drop", "held"), &Camera::set_drop);
+	ClassDB::bind_method(D_METHOD("get_drop"), &Camera::get_drop);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "take", PROPERTY_HINT_RESOURCE_TYPE, "Node", PROPERTY_USAGE_SCRIPT_VARIABLE), "set_take", "get_take");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "drop", PROPERTY_HINT_RESOURCE_TYPE, "Node", PROPERTY_USAGE_SCRIPT_VARIABLE), "set_drop", "get_drop");
 
 	BIND_ENUM_CONSTANT(PROJECTION_PERSPECTIVE);
 	BIND_ENUM_CONSTANT(PROJECTION_ORTHOGONAL);
@@ -837,6 +946,7 @@ Camera::Camera() {
 	current = false;
 	viewport = nullptr;
 	force_change = false;
+	held_node = nullptr;
 	mode = PROJECTION_PERSPECTIVE;
 	set_perspective(70.0, 0.05, 100.0);
 	keep_aspect = KEEP_HEIGHT;

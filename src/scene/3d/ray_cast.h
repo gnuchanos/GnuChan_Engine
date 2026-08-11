@@ -2,30 +2,34 @@
 /*  ray_cast.h                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             GNUCHANIDE ENGINE                          */
+/*                        https://github.com/gnuchanos                    */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
-/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*  RayCast 3D:                                                          */
+/*    - Query: is_colliding / get_collision_point / get_collision_normal */
+/*    - Target info: body_name() / body_group() / get_collider()         */
+/*    - Ignoring: skip(node) / skip_group(group)                         */
+/*    - Settings: enabled / cast_to / length                             */
+/*    - Editor debug visuals (used by spatial_editor_gizmos)             */
 /*                                                                        */
-/* Permission is hereby granted, free of charge, to any person obtaining  */
-/* a copy of this software and associated documentation files (the        */
-/* "Software"), to deal in the Software without restriction, including    */
-/* without limitation the rights to use, copy, modify, merge, publish,    */
-/* distribute, sublicense, and/or sell copies of the Software, and to     */
-/* permit persons to whom the Software is furnished to do so, subject to  */
-/* the following conditions:                                              */
+/*  Permission is hereby granted, free of charge, to any person obtaining */
+/*  a copy of this software and associated documentation files (the       */
+/*  "Software"), to deal in the Software without restriction, including   */
+/*  without limitation the rights to use, copy, modify, merge, publish,   */
+/*  distribute, sublicense, and/or sell copies of the Software, and to    */
+/*  permit persons to whom the Software is furnished to do so, subject to */
+/*  the following conditions:                                             */
 /*                                                                        */
-/* The above copyright notice and this permission notice shall be         */
-/* included in all copies or substantial portions of the Software.        */
+/*  The above copyright notice and this permission notice shall be        */
+/*  included in all copies or substantial portions of the Software.       */
 /*                                                                        */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/*  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/*  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/*  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/*  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/*  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/*  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /**************************************************************************/
 
 #ifndef RAY_CAST_H
@@ -39,15 +43,11 @@ class RayCast : public Spatial {
 	bool enabled;
 	bool collided;
 	ObjectID against;
-	int against_shape;
 	Vector3 collision_point;
 	Vector3 collision_normal;
 
 	Vector3 cast_to;
 	Set<RID> exclude;
-
-	uint32_t collision_mask;
-	bool exclude_parent_body;
 
 	Node *debug_shape;
 	Ref<Material> debug_material;
@@ -62,36 +62,52 @@ class RayCast : public Spatial {
 	void _update_debug_shape_vertices();
 	void _clear_debug_shape();
 
-	bool collide_with_areas;
 	bool collide_with_bodies;
+	bool collide_with_areas;
+
+	void _update_raycast_state();
 
 protected:
 	void _notification(int p_what);
-	void _update_raycast_state();
 	static void _bind_methods();
 
 public:
-	void set_collide_with_areas(bool p_clip);
-	bool is_collide_with_areas_enabled() const;
+	/* --- Query --- */
+	bool is_colliding() const;
+	Object *get_collider() const;
+	Vector3 get_collision_point() const;
+	Vector3 get_collision_normal() const;
 
-	void set_collide_with_bodies(bool p_clip);
-	bool is_collide_with_bodies_enabled() const;
+	/* Quick info about the hit target (GnuChan addition) */
+	String get_body_name() const;
+	String get_body_group() const;
 
+	/* --- Ignoring (GnuChan addition) --- */
+	/* Skip the passed node and every physics body in its subtree. */
+	void skip(const Object *p_object);
+
+	/* Skip every physics body that is a member of the given group. */
+	void skip_group(const StringName &p_group);
+
+	/* --- Settings --- */
 	void set_enabled(bool p_enabled);
 	bool is_enabled() const;
 
 	void set_cast_to(const Vector3 &p_point);
 	Vector3 get_cast_to() const;
 
-	void set_collision_mask(uint32_t p_mask);
-	uint32_t get_collision_mask() const;
+	/* Ray length: cast_to.z = -length (for FPS use) */
+	void set_length(real_t p_length);
+	real_t get_length() const;
 
-	void set_collision_mask_bit(int p_bit, bool p_value);
-	bool get_collision_mask_bit(int p_bit) const;
+	void set_collide_with_bodies(bool p_clip);
+	bool is_collide_with_bodies_enabled() const;
+	void set_collide_with_areas(bool p_clip);
+	bool is_collide_with_areas_enabled() const;
 
-	void set_exclude_parent_body(bool p_exclude_parent_body);
-	bool get_exclude_parent_body() const;
+	void force_raycast_update();
 
+	/* --- Editor debug visuals (used by spatial_editor_gizmos) --- */
 	const Color &get_debug_shape_custom_color() const;
 	void set_debug_shape_custom_color(const Color &p_color);
 
@@ -103,20 +119,8 @@ public:
 	int get_debug_shape_thickness() const;
 	void set_debug_shape_thickness(const int p_debug_thickness);
 
-	void force_raycast_update();
-	bool is_colliding() const;
-	Object *get_collider() const;
-	int get_collider_shape() const;
-	Vector3 get_collision_point() const;
-	Vector3 get_collision_normal() const;
-
-	void add_exception_rid(const RID &p_rid);
-	void add_exception(const Object *p_object);
-	void remove_exception_rid(const RID &p_rid);
-	void remove_exception(const Object *p_object);
-	void clear_exceptions();
-
 	RayCast();
 };
 
 #endif // RAY_CAST_H
+

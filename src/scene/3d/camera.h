@@ -62,6 +62,13 @@ private:
 	bool force_change;
 	bool current;
 
+	/* GnuChan: simple pickup/drop helpers used by FPSController scripts.
+	 * take = reparent the node under this camera and pin it in front of it.
+	 * drop = release the held node back into the scene. */
+	Node *held_node;
+
+	void _release_held();
+
 	Viewport *viewport;
 
 	Projection mode;
@@ -206,6 +213,12 @@ public:
 
 	void set_affect_lod(bool p_enable) { affect_lod = p_enable; }
 	bool get_affect_lod() const { return affect_lod; }
+
+	/* GnuChan: pickup/drop helpers (FPSController scripts use these). */
+	void set_take(Object *p_object);
+	Object *get_take() const;
+	void set_drop(Object *p_held);
+	Object *get_drop() const;
 
 	Camera();
 	~Camera();

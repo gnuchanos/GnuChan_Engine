@@ -64,6 +64,7 @@
 #include "core/math/geometry.h"
 #include "core/math/random_number_generator.h"
 #include "core/math/triangle_mesh.h"
+#include "core/node_reference.h"
 #include "core/os/input.h"
 #include "core/os/main_loop.h"
 #include "core/os/time.h"
@@ -210,6 +211,9 @@ void register_core_types() {
 	ClassDB::register_class<AStar2D>();
 	ClassDB::register_class<EncodedObjectAsID>();
 	ClassDB::register_class<RandomNumberGenerator>();
+	/* GnuChan: safe Node reference (script type `node_refferance`). */
+	ClassDB::register_class<node_refferance>();
+	ClassDB::add_compatibility_class("NodeReference", "node_refferance");
 
 	ClassDB::register_class<JSONParseResult>();
 
