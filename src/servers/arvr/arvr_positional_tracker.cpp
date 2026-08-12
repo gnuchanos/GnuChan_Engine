@@ -36,7 +36,7 @@ void ARVRPositionalTracker::_bind_methods() {
 	BIND_ENUM_CONSTANT(TRACKER_LEFT_HAND);
 	BIND_ENUM_CONSTANT(TRACKER_RIGHT_HAND);
 
-	// this class is read only from GDScript, so we only have access to getters..
+	// this class is read only from scripts, so we only have access to getters..
 	ClassDB::bind_method(D_METHOD("get_type"), &ARVRPositionalTracker::get_type);
 	ClassDB::bind_method(D_METHOD("get_tracker_id"), &ARVRPositionalTracker::get_tracker_id);
 	ClassDB::bind_method(D_METHOD("get_name"), &ARVRPositionalTracker::get_name);

@@ -2883,10 +2883,17 @@ void SpatialEditorViewport::_notification(int p_what) {
 				t_offset.basis = t_offset.basis * aabb_s;
 			}
 
-			VisualServer::get_singleton()->instance_set_transform(se->sbox_instance, t);
-			VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_offset, t_offset);
-			VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_xray, t);
-			VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_xray_offset, t_offset);
+			// Guard against stale selection data: when the node leaves the tree
+			// (scene switch/close) the SpatialEditorSelectedItem destructor frees
+			// these RIDs while a pending frame update may still reference them.
+			// Calling VisualServer with an invalid RID would spam errors and can
+			// corrupt the RID owner map.
+			if (se->sbox_instance.is_valid()) {
+				VisualServer::get_singleton()->instance_set_transform(se->sbox_instance, t);
+				VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_offset, t_offset);
+				VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_xray, t);
+				VisualServer::get_singleton()->instance_set_transform(se->sbox_instance_xray_offset, t_offset);
+			}
 		}
 
 		if (changed || (spatial_editor->is_gizmo_visible() && !exist)) {
@@ -3689,6 +3696,14 @@ void SpatialEditorViewport::set_can_preview(Camera *p_preview) {
 
 void SpatialEditorViewport::update_transform_gizmo_view() {
 	if (!is_visible_in_tree()) {
+		return;
+	}
+
+	// Guard against stale RIDs: this runs every frame the camera moves, but the
+	// gizmo instances are freed on NOTIFICATION_EXIT_TREE (scene switch/close).
+	// Calling VisualServer with the freed RIDs spams errors and can corrupt the
+	// RID owner state, eventually crashing the editor (Dictionary::empty).
+	if (!move_gizmo_instance[0].is_valid()) {
 		return;
 	}
 
@@ -6944,7 +6959,9 @@ void SpatialEditor::clear() {
 		viewports[i]->reset();
 	}
 
-	VisualServer::get_singleton()->instance_set_visible(origin_instance, true);
+	if (origin_instance.is_valid()) {
+		VisualServer::get_singleton()->instance_set_visible(origin_instance, true);
+	}
 	view_menu->get_popup()->set_item_checked(view_menu->get_popup()->get_item_index(MENU_VIEW_ORIGIN), true);
 	for (int i = 0; i < 3; ++i) {
 		if (grid_enable[i]) {

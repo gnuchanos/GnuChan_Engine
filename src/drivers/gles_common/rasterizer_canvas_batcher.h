@@ -1458,7 +1458,7 @@ bool C_PREAMBLE::_prefill_ninepatch(RasterizerCanvas::Item::CommandNinePatch *p_
 		return false;
 	}
 
-	// cope with ninepatch of zero area. These cannot be created by the user interface or gdscript, but can
+	// cope with ninepatch of zero area. These cannot be created by the user interface, but can
 	// be created programmatically from c++, e.g. by the Godot UI for sliders. We will just not draw these.
 	if ((p_np->rect.size.x * p_np->rect.size.y) <= 0.0f) {
 		return false;

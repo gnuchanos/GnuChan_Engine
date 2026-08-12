@@ -2230,15 +2230,7 @@ void VisualShaderEditor::drop_data_fw(const Point2 &p_point, const Variant &p_da
 				PoolStringArray arr = d["files"];
 				for (int i = 0; i < arr.size(); i++) {
 					String type = ResourceLoader::get_resource_type(arr[i]);
-					if (type == "GDScript") {
-						Ref<Script> script = ResourceLoader::load(arr[i]);
-						if (script->get_instance_base_type() == "VisualShaderNodeCustom") {
-							saved_node_pos = p_point + Vector2(0, j * 210 * EDSCALE);
-							saved_node_pos_dirty = true;
-							_add_custom_node(arr[i]);
-							j++;
-						}
-					} else if (ClassDB::get_parent_class(type) == "Texture") {
+					if (ClassDB::get_parent_class(type) == "Texture") {
 						saved_node_pos = p_point + Vector2(0, j * 210 * EDSCALE);
 						saved_node_pos_dirty = true;
 						_add_texture_node(arr[i]);

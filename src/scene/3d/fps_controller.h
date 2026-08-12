@@ -65,6 +65,7 @@ private:
 	bool mouse_invert_y;
 	bool mouse_captured;
 	float max_pitch_rad;
+	float camera_fov;
 
 	/* StateMachine */
 	MovementState state;
@@ -92,7 +93,6 @@ private:
 	Vector3 collision_shape_origin;
 	bool stance_cached;
 
-	void _ensure_default_children();
 	void _resolve_references();
 	void _apply_stance();
 	void _update_state();
@@ -135,6 +135,8 @@ public:
 	bool is_mouse_captured() const;
 	void set_max_pitch_degrees(float p_degrees);
 	float get_max_pitch_degrees() const;
+	void set_camera_fov(float p_fov);
+	float get_camera_fov() const;
 
 	/* StateMachine */
 	MovementState get_state() const;

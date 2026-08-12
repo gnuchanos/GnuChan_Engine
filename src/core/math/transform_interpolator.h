@@ -72,7 +72,7 @@ private:
 	static void interpolate_basis_scaled_slerp(Basis p_prev, Basis p_curr, Basis &r_result, real_t p_fraction);
 
 public:
-	// Generic functions, use when you don't know what method should be used, e.g. from gdscript.
+	// Generic functions, use when you don't know what method should be used.
 	// These will be slower.
 	static void interpolate_transform(const Transform &p_prev, const Transform &p_curr, Transform &r_result, real_t p_fraction);
 	static void interpolate_basis(const Basis &p_prev, const Basis &p_curr, Basis &r_result, real_t p_fraction);

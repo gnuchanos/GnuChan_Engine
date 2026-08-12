@@ -54,6 +54,7 @@ FPSController::FPSController() :
 		mouse_invert_y(false),
 		mouse_captured(true),
 		max_pitch_rad(Math::deg2rad(90.0)),
+		camera_fov(75.0),
 		state(STATE_GROUND),
 		interaction_length(3.0),
 		interaction_enabled(true),
@@ -84,11 +85,23 @@ void FPSController::_notification(int p_what) {
 			}
 			break;
 		case NOTIFICATION_READY:
-			_ensure_default_children();
+			/* No children are auto-created: the user builds the hierarchy
+			 * (Head/Camera/CollisionShape/InteractionRay) in the editor and
+			 * drag-and-drops the nodes onto the reference NodePath properties.
+			 * Reference properties (camera fov, raycast length, stance) are
+			 * applied live from the inspector settings. */
 			_resolve_references();
 			_apply_stance();
-			if (mouse_captured && !Engine::get_singleton()->is_editor_hint()) {
-				Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_CAPTURED);
+			if (camera != nullptr && camera_fov > 0.0) {
+				camera->set_fov(camera_fov);
+			}
+			if (interaction_ray != nullptr) {
+				interaction_ray->set_cast_to(Vector3(0, 0, -interaction_length));
+			}
+			if (!Engine::get_singleton()->is_editor_hint()) {
+				if (mouse_captured) {
+					Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_CAPTURED);
+				}
 			}
 			break;
 		case NOTIFICATION_PHYSICS_PROCESS: {
@@ -122,13 +135,14 @@ void FPSController::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_crouch_height_scale", "scale"), &FPSController::set_crouch_height_scale);
 	ClassDB::bind_method(D_METHOD("get_crouch_height_scale"), &FPSController::get_crouch_height_scale);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "walk_speed"), "set_walk_speed", "get_walk_speed");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "run_speed"), "set_run_speed", "get_run_speed");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "crouch_speed"), "set_crouch_speed", "get_crouch_speed");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "acceleration"), "set_acceleration", "get_acceleration");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "gravity"), "set_gravity", "get_gravity");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "jump_impulse"), "set_jump_impulse", "get_jump_impulse");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "crouch_height_scale"), "set_crouch_height_scale", "get_crouch_height_scale");
+	ADD_GROUP("Movement", "movement_");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_walk_speed"), "set_walk_speed", "get_walk_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_run_speed"), "set_run_speed", "get_run_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_crouch_speed"), "set_crouch_speed", "get_crouch_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_acceleration"), "set_acceleration", "get_acceleration");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_gravity"), "set_gravity", "get_gravity");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_jump_impulse"), "set_jump_impulse", "get_jump_impulse");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "movement_crouch_height_scale"), "set_crouch_height_scale", "get_crouch_height_scale");
 
 	/* LookSystem */
 	ClassDB::bind_method(D_METHOD("set_mouse_sensitivity", "sensitivity"), &FPSController::set_mouse_sensitivity);
@@ -139,15 +153,15 @@ void FPSController::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_mouse_captured"), &FPSController::is_mouse_captured);
 	ClassDB::bind_method(D_METHOD("set_max_pitch_degrees", "degrees"), &FPSController::set_max_pitch_degrees);
 	ClassDB::bind_method(D_METHOD("get_max_pitch_degrees"), &FPSController::get_max_pitch_degrees);
+	ClassDB::bind_method(D_METHOD("set_camera_fov", "fov"), &FPSController::set_camera_fov);
+	ClassDB::bind_method(D_METHOD("get_camera_fov"), &FPSController::get_camera_fov);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "mouse_sensitivity"), "set_mouse_sensitivity", "get_mouse_sensitivity");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mouse_invert_y"), "set_mouse_invert_y", "is_mouse_invert_y");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mouse_captured"), "set_mouse_captured", "is_mouse_captured");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_pitch_degrees"), "set_max_pitch_degrees", "get_max_pitch_degrees");
-
-	/* StateMachine */
-	ClassDB::bind_method(D_METHOD("get_state"), &FPSController::get_state);
-	ClassDB::bind_method(D_METHOD("is_crouching"), &FPSController::is_crouching);
+	ADD_GROUP("Look", "look_");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "look_mouse_sensitivity"), "set_mouse_sensitivity", "get_mouse_sensitivity");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "look_mouse_invert_y"), "set_mouse_invert_y", "is_mouse_invert_y");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "look_mouse_captured"), "set_mouse_captured", "is_mouse_captured");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "look_max_pitch_degrees"), "set_max_pitch_degrees", "get_max_pitch_degrees");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "look_camera_fov"), "set_camera_fov", "get_camera_fov");
 
 	/* InteractionSystem */
 	ClassDB::bind_method(D_METHOD("set_interaction_length", "length"), &FPSController::set_interaction_length);
@@ -159,10 +173,11 @@ void FPSController::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_interaction_point"), &FPSController::get_interaction_point);
 	ClassDB::bind_method(D_METHOD("get_interaction_normal"), &FPSController::get_interaction_normal);
 
+	ADD_GROUP("Interaction", "interaction_");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "interaction_length"), "set_interaction_length", "get_interaction_length");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "interaction_enabled"), "set_interaction_enabled", "is_interaction_enabled");
 
-	/* Node references (code references, set in Inspector) */
+	/* Node references (drag-and-drop NodePaths, applied live) */
 	ClassDB::bind_method(D_METHOD("set_head_path", "path"), &FPSController::set_head_path);
 	ClassDB::bind_method(D_METHOD("get_head_path"), &FPSController::get_head_path);
 	ClassDB::bind_method(D_METHOD("set_camera_path", "path"), &FPSController::set_camera_path);
@@ -172,10 +187,11 @@ void FPSController::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_interaction_ray_path", "path"), &FPSController::set_interaction_ray_path);
 	ClassDB::bind_method(D_METHOD("get_interaction_ray_path"), &FPSController::get_interaction_ray_path);
 
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "head_path"), "set_head_path", "get_head_path");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "camera_path"), "set_camera_path", "get_camera_path");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "collision_shape_path"), "set_collision_shape_path", "get_collision_shape_path");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "interaction_ray_path"), "set_interaction_ray_path", "get_interaction_ray_path");
+	ADD_GROUP("Node References", "reference_");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "reference_head_path"), "set_head_path", "get_head_path");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "reference_camera_path"), "set_camera_path", "get_camera_path");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "reference_collision_shape_path"), "set_collision_shape_path", "get_collision_shape_path");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "reference_interaction_ray_path"), "set_interaction_ray_path", "get_interaction_ray_path");
 
 	ClassDB::bind_method(D_METHOD("get_head"), &FPSController::get_head);
 	ClassDB::bind_method(D_METHOD("get_camera"), &FPSController::get_camera);
@@ -188,75 +204,6 @@ void FPSController::_bind_methods() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Default child hierarchy (idempotent)                               */
-/*  Finds existing children by name first, creates them only if        */
-/*  missing, and always fills the Inspector NodePaths so the node      */
-/*  works out of the box without manual reference wiring.              */
-/* ------------------------------------------------------------------ */
-
-void FPSController::_ensure_default_children() {
-	if (!is_inside_tree()) {
-		return;
-	}
-
-	Node *head_node = has_node(NodePath("Head")) ? get_node(NodePath("Head")) : nullptr;
-	head = Object::cast_to<Spatial>(head_node);
-	if (head == nullptr) {
-		head = memnew(Spatial);
-		head->set_name("Head");
-		head->set_translation(Vector3(0, 2.138, 0));
-		add_child(head);
-		head->set_owner(this);
-	}
-	head_path = head->get_path_to(this) == NodePath() ? head->get_path() : get_path_to(head);
-
-	Node *camera_node = has_node(NodePath("Head/Camera")) ? get_node(NodePath("Head/Camera")) : nullptr;
-	camera = Object::cast_to<Camera>(camera_node);
-	if (camera == nullptr) {
-		camera = memnew(Camera);
-		camera->set_name("Camera");
-		camera->set_fov(75.0);
-		head->add_child(camera);
-		camera->set_owner(this);
-	}
-	camera_path = get_path_to(camera);
-
-	Node *shape_node = has_node(NodePath("CollisionShape")) ? get_node(NodePath("CollisionShape")) : nullptr;
-	collision_shape_node = Object::cast_to<CollisionShape>(shape_node);
-	if (collision_shape_node == nullptr) {
-		Ref<CapsuleShape> capsule = memnew(CapsuleShape);
-		capsule->set_radius(0.4);
-		capsule->set_height(1.8);
-
-		collision_shape_node = memnew(CollisionShape);
-		collision_shape_node->set_name("CollisionShape");
-		collision_shape_node->set_shape(capsule);
-		collision_shape_node->set_translation(Vector3(0, 0.9, 0));
-		collision_shape_node->rotate_x(Math_PI / 2.0); // capsule long axis is Z in Godot 3.x; stand it upright
-		add_child(collision_shape_node);
-		collision_shape_node->set_owner(this);
-	}
-	collision_shape_path = get_path_to(collision_shape_node);
-
-	Node *ray_node = has_node(NodePath("Head/InteractionRay")) ? get_node(NodePath("Head/InteractionRay")) : nullptr;
-	interaction_ray = Object::cast_to<RayCast>(ray_node);
-	if (interaction_ray == nullptr) {
-		interaction_ray = memnew(RayCast);
-		interaction_ray->set_name("InteractionRay");
-		interaction_ray->set_cast_to(Vector3(0, 0, -interaction_length));
-		head->add_child(interaction_ray);
-		interaction_ray->set_owner(this);
-	}
-	/* Never let the ray hit the player's own body: the RayCast parent is Head
-	 * (Spatial), so its built-in exclude_parent_body cannot see this KinematicBody.
-	 * skip(this) walks this node's subtree and excludes every physics body,
-	 * so the player capsule is always ignored. Scripts can add more ignores
-	 * at any time via $Head/InteractionRay.skip(node). */
-	interaction_ray->skip(this);
-	interaction_ray_path = get_path_to(interaction_ray);
-}
-
-/* ------------------------------------------------------------------ */
 /*  Reference resolution                                               */
 /* ------------------------------------------------------------------ */
 
@@ -265,6 +212,15 @@ void FPSController::_resolve_references() {
 	camera = Object::cast_to<Camera>(get_node_or_null(camera_path));
 	collision_shape_node = Object::cast_to<CollisionShape>(get_node_or_null(collision_shape_path));
 	interaction_ray = Object::cast_to<RayCast>(get_node_or_null(interaction_ray_path));
+
+	/* Reference yollar cozuldukten SONRA interaction_length'i ray'e uygula.
+	 * tscn'de interaction_length, reference_interaction_ray_path'ten once
+	 * yazilir; setter'lar dosya sirasina gore calistigi icin ilk uygulama
+	 * ray null iken bos gecer ve eski deger kalir (Length 30 girilir, cizgi
+	 * hala eski uzunlukta gozukur). Bu senkron bir kez burada yapilir. */
+	if (interaction_ray != nullptr) {
+		interaction_ray->set_cast_to(Vector3(0, 0, -interaction_length));
+	}
 
 	collision_capsule = nullptr;
 	if (collision_shape_node != nullptr) {
@@ -531,6 +487,16 @@ float FPSController::get_max_pitch_degrees() const {
 	return Math::rad2deg(max_pitch_rad);
 }
 
+void FPSController::set_camera_fov(float p_fov) {
+	camera_fov = p_fov;
+	if (camera != nullptr) {
+		camera->set_fov(p_fov);
+	}
+}
+float FPSController::get_camera_fov() const {
+	return camera_fov;
+}
+
 /* ------------------------------------------------------------------ */
 /*  StateMachine                                                       */
 /* ------------------------------------------------------------------ */
@@ -596,6 +562,8 @@ Vector3 FPSController::get_interaction_normal() const {
 
 void FPSController::set_head_path(const NodePath &p_path) {
 	head_path = p_path;
+	_resolve_references();
+	_apply_stance();
 }
 NodePath FPSController::get_head_path() const {
 	return head_path;
@@ -603,6 +571,10 @@ NodePath FPSController::get_head_path() const {
 
 void FPSController::set_camera_path(const NodePath &p_path) {
 	camera_path = p_path;
+	_resolve_references();
+	if (camera != nullptr && camera_fov > 0.0) {
+		camera->set_fov(camera_fov);
+	}
 }
 NodePath FPSController::get_camera_path() const {
 	return camera_path;
@@ -610,6 +582,8 @@ NodePath FPSController::get_camera_path() const {
 
 void FPSController::set_collision_shape_path(const NodePath &p_path) {
 	collision_shape_path = p_path;
+	_resolve_references();
+	_apply_stance();
 }
 NodePath FPSController::get_collision_shape_path() const {
 	return collision_shape_path;
@@ -617,6 +591,10 @@ NodePath FPSController::get_collision_shape_path() const {
 
 void FPSController::set_interaction_ray_path(const NodePath &p_path) {
 	interaction_ray_path = p_path;
+	_resolve_references();
+	if (interaction_ray != nullptr) {
+		interaction_ray->set_cast_to(Vector3(0, 0, -interaction_length));
+	}
 }
 NodePath FPSController::get_interaction_ray_path() const {
 	return interaction_ray_path;

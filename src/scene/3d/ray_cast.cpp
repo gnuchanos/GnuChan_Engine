@@ -35,6 +35,7 @@
 #include "ray_cast.h"
 
 #include "collision_object.h"
+#include "core/array.h"
 #include "core/engine.h"
 #include "mesh_instance.h"
 #include "scene/main/viewport.h"
@@ -121,6 +122,95 @@ void RayCast::skip(const Object *p_object) {
 			pending.push_back(current->get_child(i));
 		}
 	}
+}
+
+void RayCast::Skip(const Variant &p_arg) {
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	/* FPSController.gcl: self.Raycast.Skip("floor") — node adina gore
+	 * agac taramasi yapar ve o isimdeki node'un alt agacindaki tum fizik
+	 * govdelerini sorgu disi birakir. */
+	if (p_arg.get_type() == Variant::STRING) {
+		String p_body_name = p_arg;
+		List<Node *> pending;
+		pending.push_back(Object::cast_to<Node>(get_tree()->get_root()));
+
+		while (!pending.empty()) {
+			Node *current = pending.front()->get();
+			pending.pop_front();
+
+			if (current->get_name() == p_body_name) {
+				skip(current);
+			}
+
+			for (int i = 0; i < current->get_child_count(); i++) {
+				pending.push_back(current->get_child(i));
+			}
+		}
+		return;
+	}
+
+	/* self.Raycast.Skip(self): arguman bir Node/Object ise o node'un alt
+	 * agacindaki tum fizik govdelerini sorgu disi birak — FPS karakterinin
+	 * kendi capsule'i raycast'e takilmasin. */
+	Object *ob = p_arg;
+	if (ob == nullptr) {
+		return;
+	}
+	const Node *node = Object::cast_to<Node>(ob);
+	if (node == nullptr) {
+		return;
+	}
+	skip(node);
+}
+
+void RayCast::SkipList(const Array &p_names) {
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	/* FPSController.gcl: self.Raycast.SkipList({"name1", "name2", "name3"}) */
+	for (int i = 0; i < p_names.size(); i++) {
+		String name = p_names[i];
+		if (name == "") {
+			continue;
+		}
+		Skip(name);
+	}
+}
+
+void RayCast::SkipGrupName(const String &p_group_name) {
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	/* FPSController.gcl: self.Raycast.SkipGrupName("WALL") — gruba uye tum
+	 * node'lari ve alt agaclarini sorgu disi birakir. */
+	skip_group(p_group_name);
+}
+
+Object *RayCast::GetNode() {
+	/* FPSController.gcl: NodeRef OBJ = self.Raycast.GetNode; */
+	/* Anlik guncelleme: GCL kodu E'ye bastigi anda sorguyu calistirir;
+	 * son fizik karesinin (hatta ilk karenin — enabled=false — null) sonucu
+	 * donmesin. */
+	_update_raycast_state();
+	return get_collider();
+}
+
+String RayCast::GetBodyName() {
+	/* FPSController.gcl: char *BodyName = self.Raycast.GetBodyName; */
+	_update_raycast_state();
+	return get_body_name();
+}
+
+bool RayCast::IsColliding() {
+	/* FPSController.gcl: if (self.Raycast.IsColliding) — parantezsiz kullanim.
+	 * Cagri aninda sorguyu calistirir (anlik sonuc). */
+	_update_raycast_state();
+	return collided;
 }
 
 void RayCast::skip_group(const StringName &p_group) {
@@ -496,6 +586,14 @@ void RayCast::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("skip", "node"), &RayCast::skip);
 	ClassDB::bind_method(D_METHOD("skip_group", "group"), &RayCast::skip_group);
 
+	/* GCL-friendly aliases (FPSController.gcl ile birebir isimler) */
+	ClassDB::bind_method(D_METHOD("Skip", "arg"), &RayCast::Skip);
+	ClassDB::bind_method(D_METHOD("SkipList", "names"), &RayCast::SkipList);
+	ClassDB::bind_method(D_METHOD("SkipGrupName", "group_name"), &RayCast::SkipGrupName);
+	ClassDB::bind_method(D_METHOD("GetNode"), &RayCast::GetNode);
+	ClassDB::bind_method(D_METHOD("GetBodyName"), &RayCast::GetBodyName);
+	ClassDB::bind_method(D_METHOD("IsColliding"), &RayCast::IsColliding);
+
 	/* Settings */
 	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &RayCast::set_enabled);
 	ClassDB::bind_method(D_METHOD("is_enabled"), &RayCast::is_enabled);
@@ -534,7 +632,10 @@ void RayCast::_bind_methods() {
 }
 
 RayCast::RayCast() {
-	enabled = false;
+	enabled = true; /* Stok Godot varsayilani true'dur. Bu motorun ozel
+	 * kurucusu bunu false yapiyordu; main_.tscn'de "enabled" satiri
+	 * olmadiginda runtime'da sorgu hic calismiyordu — editorde
+	 * visible-collision cizgisi gorunse bile collided hep false kaliyordu. */
 	against = 0;
 	collided = false;
 	cast_to = Vector3(0, 0, -3);

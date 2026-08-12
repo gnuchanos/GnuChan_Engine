@@ -244,9 +244,10 @@ protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
-#ifdef DEV_ENABLED
+	// Always declared: the test suite (tests.lib) references this slot in the
+	// vtable regardless of DEV_ENABLED. Keeping it unconditional also keeps
+	// the vtable layout consistent across all translation units.
 	virtual void _name_changed_notify();
-#endif
 
 public:
 	enum {

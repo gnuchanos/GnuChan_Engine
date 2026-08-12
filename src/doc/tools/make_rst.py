@@ -1225,7 +1225,7 @@ def make_rst_index(grouped_classes: Dict[str, List[str]], dry_run: bool, output_
 
 
 RESERVED_FORMATTING_TAGS = ["i", "b", "u", "code", "kbd", "center", "url", "br"]
-RESERVED_CODEBLOCK_TAGS = ["codeblocks", "codeblock", "gdscript", "csharp"]
+RESERVED_CODEBLOCK_TAGS = ["codeblocks", "codeblock", "csharp"]
 RESERVED_CROSSLINK_TAGS = ["method", "member", "signal", "constant", "enum", "theme_item", "param"]
 
 
@@ -1266,7 +1266,6 @@ def format_text_block(
         # Handle codeblocks
         if (
             post_text.startswith("[codeblock]")
-            or post_text.startswith("[gdscript]")
             or post_text.startswith("[csharp]")
         ):
             block_type = post_text[1:].split("]")[0]
@@ -1329,7 +1328,7 @@ def format_text_block(
                 # Exiting codeblocks and inline code tags.
 
                 if inside_code_tag == cmd[1:]:
-                    if cmd == "/codeblock" or cmd == "/gdscript" or cmd == "/csharp":
+                    if cmd == "/codeblock" or cmd == "/csharp":
                         tag_text = ""
                         tag_depth -= 1
                         inside_code = False
@@ -1363,17 +1362,10 @@ def format_text_block(
                 tag_text = ""
                 inside_code_tabs = False
 
-            elif cmd == "codeblock" or cmd == "gdscript" or cmd == "csharp":
+            elif cmd == "codeblock" or cmd == "csharp":
                 tag_depth += 1
 
-                if cmd == "gdscript":
-                    if not inside_code_tabs:
-                        print_error(
-                            f"{state.current_class}.xml: GDScript code block is used outside of [codeblocks] in {context_name}.",
-                            state,
-                        )
-                    tag_text = "\n .. code-tab:: gdscript\n"
-                elif cmd == "csharp":
+                if cmd == "csharp":
                     if not inside_code_tabs:
                         print_error(
                             f"{state.current_class}.xml: C# code block is used outside of [codeblocks] in {context_name}.",

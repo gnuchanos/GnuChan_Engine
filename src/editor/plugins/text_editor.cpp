@@ -47,7 +47,7 @@ void TextEditor::set_syntax_highlighter(SyntaxHighlighter *p_highlighter) {
 		highlighter_menu->set_item_checked(highlighter_menu->get_item_idx_from_text(TTR("Standard")), true);
 	}
 
-	// little work around. GDScript highlighter goes through text_edit for colours,
+	// little work around. The script highlighter goes through text_edit for colours,
 	// so to remove all colours we need to set and unset them here.
 	if (p_highlighter == nullptr) { // standard
 		TextEdit *text_edit = code_editor->get_text_edit();

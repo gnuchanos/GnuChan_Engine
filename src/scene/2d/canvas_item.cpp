@@ -637,16 +637,17 @@ void CanvasItem::_notification(int p_what) {
 	}
 }
 
-#ifdef DEV_ENABLED
 void CanvasItem::_name_changed_notify() {
-	// Even in DEV builds, there is no point in calling this unless we are debugging
-	// canvas item names. Even calling the stub function will be expensive, as there
-	// are a lot of canvas items.
+	// Always defined: the test suite (tests.lib) references this slot in the
+	// vtable regardless of DEV_ENABLED, and leaving the symbol out caused
+	// LNK2001 in release_debug builds.
+	// Even in DEV builds, there is no point in calling this unless we are
+	// debugging canvas item names. Even calling the stub function will be
+	// expensive, as there are a lot of canvas items.
 #ifdef VISUAL_SERVER_CANVAS_DEBUG_ITEM_NAMES
 	VisualServer::get_singleton()->canvas_item_set_name(canvas_item, get_name());
 #endif
 }
-#endif
 
 void CanvasItem::update_draw_order() {
 	if (!is_inside_tree()) {

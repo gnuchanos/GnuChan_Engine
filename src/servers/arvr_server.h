@@ -105,7 +105,7 @@ public:
 		Most VR platforms, and our assumption, is that 1 unit in our virtual world equates to 1 meter in the real mode.
 		This scale basically effects the unit size relationship to real world size.
 
-		I may remove access to this property in GDScript in favour of exposing it on the ARVROrigin node
+		I may remove access to this property in favour of exposing it on the ARVROrigin node
 	*/
 	real_t get_world_scale() const;
 	void set_world_scale(real_t p_world_scale);
@@ -117,7 +117,7 @@ public:
 		in relation to this point.
 
 		Note that the ARVROrigin spatial node in your scene automatically updates this property and it should be used instead of
-		direct access to this property and it therefore is not available in GDScript
+		direct access to this property
 
 		Note: this should not be used in AR and should be ignored by an AR based interface as it would throw what you're looking at in the real world
 		and in the virtual world out of sync

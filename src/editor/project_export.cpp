@@ -293,27 +293,6 @@ void ProjectExportDialog::_edit_preset(int p_index) {
 	_update_export_all();
 	minimum_size_changed();
 
-	int script_export_mode = current->get_script_export_mode();
-	script_mode->select(script_export_mode);
-
-	String key = current->get_script_encryption_key();
-	if (!updating_script_key) {
-		script_key->set_text(key);
-	}
-	if (script_export_mode == EditorExportPreset::MODE_SCRIPT_ENCRYPTED) {
-		script_key->set_editable(true);
-
-		bool key_valid = _validate_script_encryption_key(key);
-		if (key_valid) {
-			script_key_error->hide();
-		} else {
-			script_key_error->show();
-		}
-	} else {
-		script_key->set_editable(false);
-		script_key_error->hide();
-	}
-
 	updating = false;
 }
 
@@ -433,47 +412,6 @@ void ProjectExportDialog::_export_path_changed(const StringName &p_property, con
 	current->set_export_path(p_value);
 	_update_presets();
 	_update_export_all();
-}
-
-void ProjectExportDialog::_open_key_help_link() {
-	OS::get_singleton()->shell_open(vformat("%s/development/compiling/compiling_with_script_encryption_key.html", VERSION_DOCS_URL));
-}
-
-void ProjectExportDialog::_script_export_mode_changed(int p_mode) {
-	if (updating) {
-		return;
-	}
-
-	Ref<EditorExportPreset> current = get_current_preset();
-	ERR_FAIL_COND(current.is_null());
-
-	current->set_script_export_mode(p_mode);
-
-	_update_current_preset();
-}
-
-void ProjectExportDialog::_script_encryption_key_changed(const String &p_key) {
-	if (updating) {
-		return;
-	}
-
-	Ref<EditorExportPreset> current = get_current_preset();
-	ERR_FAIL_COND(current.is_null());
-
-	current->set_script_encryption_key(p_key);
-
-	updating_script_key = true;
-	_update_current_preset();
-	updating_script_key = false;
-}
-
-bool ProjectExportDialog::_validate_script_encryption_key(const String &p_key) {
-	bool is_valid = false;
-
-	if (!p_key.empty() && p_key.is_valid_hex_number(false) && p_key.length() == 64) {
-		is_valid = true;
-	}
-	return is_valid;
 }
 
 void ProjectExportDialog::_duplicate_preset() {
@@ -952,9 +890,6 @@ void ProjectExportDialog::_bind_methods() {
 	ClassDB::bind_method("_open_export_template_manager", &ProjectExportDialog::_open_export_template_manager);
 	ClassDB::bind_method("_validate_export_path", &ProjectExportDialog::_validate_export_path);
 	ClassDB::bind_method("_export_path_changed", &ProjectExportDialog::_export_path_changed);
-	ClassDB::bind_method("_open_key_help_link", &ProjectExportDialog::_open_key_help_link);
-	ClassDB::bind_method("_script_export_mode_changed", &ProjectExportDialog::_script_export_mode_changed);
-	ClassDB::bind_method("_script_encryption_key_changed", &ProjectExportDialog::_script_encryption_key_changed);
 	ClassDB::bind_method("_export_project", &ProjectExportDialog::_export_project);
 	ClassDB::bind_method("_export_project_to_path", &ProjectExportDialog::_export_project_to_path);
 	ClassDB::bind_method("_export_all", &ProjectExportDialog::_export_all);
@@ -1099,36 +1034,6 @@ ProjectExportDialog::ProjectExportDialog() {
 	feature_vb->add_margin_child(TTR("Feature List:"), custom_feature_display, true);
 	sections->add_child(feature_vb);
 
-	// Script export parameters.
-
-	updating_script_key = false;
-
-	VBoxContainer *script_vb = memnew(VBoxContainer);
-	script_vb->set_name(TTR("Script"));
-	script_mode = memnew(OptionButton);
-	script_vb->add_margin_child(TTR("GDScript Export Mode:"), script_mode);
-	script_mode->add_item(TTR("Text"), (int)EditorExportPreset::MODE_SCRIPT_TEXT);
-	script_mode->add_item(TTR("Compiled Bytecode (Faster Loading)"), (int)EditorExportPreset::MODE_SCRIPT_COMPILED);
-	script_mode->add_item(TTR("Encrypted (Provide Key Below)"), (int)EditorExportPreset::MODE_SCRIPT_ENCRYPTED);
-	script_mode->connect("item_selected", this, "_script_export_mode_changed");
-	script_key = memnew(LineEdit);
-	script_key->connect("text_changed", this, "_script_encryption_key_changed");
-	script_key_error = memnew(Label);
-	script_key_error->set_text(String::utf8("• ") + TTR("Invalid Encryption Key (must be 64 hexadecimal characters long)"));
-	script_key_error->add_color_override("font_color", EditorNode::get_singleton()->get_gui_base()->get_color("error_color", "Editor"));
-	script_vb->add_margin_child(TTR("GDScript Encryption Key (256-bits as hexadecimal):"), script_key);
-	script_vb->add_child(script_key_error);
-	sections->add_child(script_vb);
-
-	Label *sec_info = memnew(Label);
-	sec_info->set_text(TTR("Note: Encryption key needs to be stored in the binary,\nyou need to build the export templates from source."));
-	script_vb->add_child(sec_info);
-
-	LinkButton *sec_more_info = memnew(LinkButton);
-	sec_more_info->set_text(TTR("More Info..."));
-	sec_more_info->connect("pressed", this, "_open_key_help_link");
-	script_vb->add_child(sec_more_info);
-
 	sections->connect("tab_changed", this, "_tab_changed");
 
 	// Disable by default.
@@ -1137,7 +1042,6 @@ ProjectExportDialog::ProjectExportDialog() {
 	runnable->set_disabled(true);
 	duplicate_preset->set_disabled(true);
 	delete_preset->set_disabled(true);
-	script_key_error->hide();
 	sections->hide();
 	parameters->edit(nullptr);
 

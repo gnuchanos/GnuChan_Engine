@@ -89,6 +89,32 @@ public:
 	/* Skip every physics body that is a member of the given group. */
 	void skip_group(const StringName &p_group);
 
+	/* --- GCL-friendly aliases (GnuChan addition) ---
+	 * Isimler FPSController.gcl'deki kullanimla birebir aynidir. */
+	/* Skip("name") VEYA Skip(node): String verilirse adi verilen node'un,
+	 * Node/Object verilirse (GCL: self.Raycast.Skip(self)) o node'un alt
+	 * agacindaki tum fizik govdelerini sorgu disi birakir. */
+	void Skip(const Variant &p_arg);
+
+	/* SkipList({"a","b"}): adlari verilen node'lari ve alt agaclarini
+	 * sorgu disi birakir. */
+	void SkipList(const Array &p_names);
+
+	/* SkipGrupName("WALL"): grubun adi verilen gruba uye tum node'larin
+	 * alt agaclarini sorgu disi birakir. */
+	void SkipGrupName(const String &p_group_name);
+
+	/* GetNode: isabet eden fizik govdesi node'unu dondurur. Cagri aninda
+	 * sorguyu gunceller (anlik sonuc) — eski fizik karesinin null'u donmez. */
+	Object *GetNode();
+
+	/* GetBodyName: isabet eden govdenin node adini dondurur (anlik guncelleme). */
+	String GetBodyName();
+
+	/* IsColliding: self.Raycast.IsColliding — raycast o anda bir govdeye
+	 * degiyor mu? Cagri aninda sorguyu gunceller (anlik sonuc). */
+	bool IsColliding();
+
 	/* --- Settings --- */
 	void set_enabled(bool p_enabled);
 	bool is_enabled() const;
@@ -123,4 +149,3 @@ public:
 };
 
 #endif // RAY_CAST_H
-

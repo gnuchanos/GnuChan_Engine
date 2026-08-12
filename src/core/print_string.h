@@ -58,5 +58,7 @@ extern bool _print_error_enabled;
 extern void print_line(String p_string);
 extern void print_error(String p_string);
 extern void print_verbose(String p_string);
+// Same as print_line but does NOT append a newline (C-style printf behaviour).
+extern void print_string(String p_string);
 
 #endif // PRINT_STRING_H

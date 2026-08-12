@@ -108,3 +108,19 @@ void print_verbose(String p_string) {
 		print_line(p_string);
 	}
 }
+
+void print_string(String p_string) {
+	if (!_print_line_enabled) {
+		return;
+	}
+
+	OS::get_singleton()->print("%s", p_string.utf8().get_data());
+
+	_global_lock();
+	PrintHandlerList *l = print_handler_list;
+	while (l) {
+		l->printfunc(l->userdata, p_string, false);
+		l = l->next;
+	}
+	_global_unlock();
+}

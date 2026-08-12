@@ -309,8 +309,6 @@ def generate_scu_files(verbose, is_release_build):
     process_folder(["modules/gridmap"])
 
     process_folder(["modules/csg"])
-    process_folder(["modules/gdscript"])
-    process_folder(["modules/gdscript/language_server"])
 
     process_folder(["modules/fbx"])
     process_folder(["modules/fbx/tools"])
