@@ -1,168 +1,172 @@
 /**************************************************************************/
 /*  gcl_script.h                                                          */
 /**************************************************************************/
-/*  GCLScript (Script resource), GCLScriptInstance (ScriptInstance) and   */
-/*  GCLScriptLanguage (ScriptLanguage) for the GCL language.              */
-/*                                                                        */
-/*  Engine-facing layer: glues the engine to the language modules         */
-/*  (lexer/parser/interpreter/completion).                                */
+/*  GCL registered as a Godot ScriptLanguage.                             */
+/*  Extensions (gcl_language.md "files"):                                 */
+/*    .gcsf   normal GCL script file                                      */
+/*    .gclib  modular GCL library file                                    */
+/*  Ayrica: otomatik tamamlama (complete_code) ve self sistemi            */
+/*    @extern <node>  -> self.<node> erisimi                              */
+/*    Ready / Update / PhysicsUpdate  -> isletim fonksiyonlari            */
 /**************************************************************************/
 
 #ifndef GCL_SCRIPT_H
 #define GCL_SCRIPT_H
 
+#include "core/io/multiplayer_api.h"
+#include "core/map.h"
+#include "core/object.h"
+#include "core/pool_vector.h"
 #include "core/script_language.h"
-#include "gcl_core.h"
-#include "gcl_interpreter.h"
+#include "core/set.h"
 
-class GCLScriptLanguage;
+#include "Executor/executor.h"
 
-/* ------------------------------------------------------------------ */
-/*  GCLScript (Script resource)                                        */
-/* ------------------------------------------------------------------ */
+namespace gcl {
+
+/* Autocomplete modulu: GCL kodu icin oneriler uretir.
+   p_owner: script'in bagli oldugu nesne (sahnedeki node adlari icin). */
+Error autocomplete_run(const String &p_code, Object *p_owner, List<ScriptCodeCompletionOption> *r_options);
+
+class GCLScriptInstance;
 
 class GCLScript : public Script {
 	GDCLASS(GCLScript, Script);
 
-	friend class GCLScriptInstance;
-	friend class GCLScriptLanguage;
+	String source_code;
+	Set<Object *> instances;
 
 protected:
 	static void _bind_methods();
 
-private:
-	String source;
-	bool valid;
-
 public:
-	GCLScriptData data;
+	bool can_instance() const override { return true; }
+	Ref<Script> get_base_script() const override { return Ref<Script>(); }
+	bool inherits_script(const Ref<Script> &p_script) const override { return false; }
+	StringName get_instance_base_type() const override { return StringName("Node"); }
+	ScriptInstance *instance_create(Object *p_this) override;
+	bool instance_has(const Object *p_this) const override { return instances.has((Object *)p_this); }
 
-	String get_extern_class() const;
+	bool has_source_code() const override { return !source_code.empty(); }
+	String get_source_code() const override { return source_code; }
+	void set_source_code(const String &p_code) override { source_code = p_code; }
+	Error reload(bool p_keep_state = false) override { return OK; }
 
-	virtual bool can_instance() const;
-	virtual Ref<Script> get_base_script() const;
-	virtual bool inherits_script(const Ref<Script> &p_script) const;
-	virtual StringName get_instance_base_type() const;
-	virtual ScriptInstance *instance_create(Object *p_this);
-	virtual bool instance_has(const Object *p_this) const;
+	bool has_method(const StringName &p_method) const override { return false; }
+	MethodInfo get_method_info(const StringName &p_method) const override { return MethodInfo(); }
 
-	virtual bool has_source_code() const;
-	virtual String get_source_code() const;
-	virtual void set_source_code(const String &p_code);
-	virtual Error reload(bool p_keep_state = false);
+	bool is_tool() const override { return false; }
+	bool is_valid() const override { return true; }
 
-	virtual bool has_method(const StringName &p_method) const;
-	virtual MethodInfo get_method_info(const StringName &p_method) const;
-	virtual bool is_tool() const;
-	virtual bool is_valid() const;
-	virtual ScriptLanguage *get_language() const;
-	virtual bool has_script_signal(const StringName &p_signal) const;
-	virtual void get_script_signal_list(List<MethodInfo> *r_signals) const;
-	virtual bool get_property_default_value(const StringName &p_property, Variant &r_value) const;
-	virtual void get_script_method_list(List<MethodInfo> *p_list) const;
-	virtual void get_script_property_list(List<PropertyInfo> *p_list) const;
+	ScriptLanguage *get_language() const override;
 
-	GCLScript();
+	bool has_script_signal(const StringName &p_signal) const override { return false; }
+	void get_script_signal_list(List<MethodInfo> *r_signals) const override {}
+	bool get_property_default_value(const StringName &p_property, Variant &r_value) const override { return false; }
+	void get_script_method_list(List<MethodInfo> *p_list) const override {}
+	void get_script_property_list(List<PropertyInfo> *p_list) const override {}
 };
 
-/* ------------------------------------------------------------------ */
-/*  GCLScriptInstance                                                  */
-/* ------------------------------------------------------------------ */
-
 class GCLScriptInstance : public ScriptInstance {
-	friend class GCLScript;
-
 	Object *owner;
 	Ref<GCLScript> script;
 
-	static const int kMaxCallDepth = 1024;
-	int call_depth;
+	/* self sistemi: property adi -> deger (degiskenler + extern node'lar). */
+	Map<StringName, Variant> members;
 
-	Map<StringName, Variant> member_vars;
+	/* typed tanimlari: typedef/enum/struct/union kayitlari. */
+	GCLTypeRegistry types;
 
 public:
-	bool enter_call(String *r_error);
-	void leave_call();
+	GCLScriptInstance(Object *p_owner, Ref<GCLScript> p_script);
+	~GCLScriptInstance() {}
 
-	bool has_function(const StringName &p_name) const;
-	Variant call_function(const StringName &p_name, const Variant **p_args, int p_argcount, Variant::CallError &r_error);
-	Variant call_function(const StringName &p_name, const Vector<Variant> &p_args);
+	bool set(const StringName &p_name, const Variant &p_value) override;
+	bool get(const StringName &p_name, Variant &r_ret) const override;
+	void get_property_list(List<PropertyInfo> *p_properties) const override;
+	Variant::Type get_property_type(const StringName &p_name, bool *r_is_valid = nullptr) const override;
 
-	virtual bool set(const StringName &p_name, const Variant &p_value);
-	virtual bool get(const StringName &p_name, Variant &r_ret) const;
-	virtual void get_property_list(List<PropertyInfo> *p_properties) const;
-	virtual Variant::Type get_property_type(const StringName &p_name, bool *r_is_valid = nullptr) const;
+	void get_method_list(List<MethodInfo> *p_list) const override;
+	bool has_method(const StringName &p_method) const override;
+	Variant call(const StringName &p_method, const Variant **p_args, int p_argcount, Variant::CallError &r_error) override;
+	void notification(int p_notification) override;
 
-	virtual void get_method_list(List<MethodInfo> *p_list) const;
-	virtual bool has_method(const StringName &p_method) const;
-	virtual Variant call(const StringName &p_method, const Variant **p_args, int p_argcount, Variant::CallError &r_error);
-	virtual void notification(int p_notification);
-	virtual Ref<Script> get_script() const;
-	virtual ScriptLanguage *get_language();
-	virtual MultiplayerAPI::RPCMode get_rpc_mode(const StringName &p_method) const;
-	virtual MultiplayerAPI::RPCMode get_rset_mode(const StringName &p_variable) const;
+	Ref<Script> get_script() const override { return script; }
+	MultiplayerAPI::RPCMode get_rpc_mode(const StringName &p_method) const override { return MultiplayerAPI::RPC_MODE_DISABLED; }
+	MultiplayerAPI::RPCMode get_rset_mode(const StringName &p_variable) const override { return MultiplayerAPI::RPC_MODE_DISABLED; }
+	ScriptLanguage *get_language() override { return script->get_language(); }
 
-	void set_owner(Object *p_owner);
-	Object *get_owner();
-
-	GCLScriptInstance();
+	/* self sistemi: script kaynagindaki @extern ve degiskenleri yukler. */
+	void load_members();
 };
-
-/* ------------------------------------------------------------------ */
-/*  GCLScriptLanguage                                                  */
-/* ------------------------------------------------------------------ */
 
 class GCLScriptLanguage : public ScriptLanguage {
 	static GCLScriptLanguage *singleton;
 
 public:
-	static GCLScriptLanguage *get_singleton();
+	static GCLScriptLanguage *get_singleton() { return singleton; }
+	GCLScriptLanguage() { singleton = this; }
+	~GCLScriptLanguage() {
+		if (singleton == this) {
+			singleton = nullptr;
+		}
+	}
 
-	virtual String get_name() const;
-	virtual void init();
-	virtual String get_type() const;
-	virtual String get_extension() const;
-	virtual Error execute_file(const String &p_path);
-	virtual void finish();
+	String get_name() const override { return "GCL"; }
+	void init() override {}
+	String get_type() const override { return "GCL"; }
+	String get_extension() const override { return "gcsf"; }
+	Error execute_file(const String &p_path) override;
+	void finish() override {}
 
-	virtual void get_reserved_words(List<String> *p_words) const;
-	virtual bool is_control_flow_keyword(String p_keyword) const;
-	virtual void get_comment_delimiters(List<String> *p_delimiters) const;
-	virtual void get_string_delimiters(List<String> *p_delimiters) const;
-	virtual Ref<Script> get_template(const String &p_class_name, const String &p_base_class_name) const;
-	virtual bool validate(const String &p_script, int &r_line_error, int &r_col_error, String &r_test_error, const String &p_path = "", List<String> *r_functions = nullptr, List<Warning> *r_warnings = nullptr, Set<int> *r_safe_lines = nullptr) const;
-	virtual Script *create_script() const;
-	virtual bool has_named_classes() const;
-	virtual bool supports_builtin_mode() const;
-	virtual int find_function(const String &p_function, const String &p_code) const;
-	virtual String make_function(const String &p_class, const String &p_name, const PoolStringArray &p_args) const;
-	virtual void auto_indent_code(String &p_code, int p_from_line, int p_to_line) const;
-	virtual Error complete_code(const String &p_code, const String &p_path, Object *p_owner, List<ScriptCodeCompletionOption> *r_options, bool &r_force, String &r_call_hint);
-	virtual void add_global_constant(const StringName &p_variable, const Variant &p_value);
+	void get_reserved_words(List<String> *p_words) const override;
+	bool is_control_flow_keyword(String p_string) const override;
+	void get_comment_delimiters(List<String> *p_delimiters) const override {
+		p_delimiters->push_back("#");
+		p_delimiters->push_back("#|");
+		p_delimiters->push_back("|#");
+	}
+	void get_string_delimiters(List<String> *p_delimiters) const override {
+		p_delimiters->push_back("\"");
+	}
+	Ref<Script> get_template(const String &p_class_name, const String &p_base_class_name) const override;
+	bool validate(const String &p_script, int &r_line_error, int &r_col_error, String &r_test_error, const String &p_path = "", List<String> *r_functions = nullptr, List<Warning> *r_warnings = nullptr, Set<int> *r_safe_lines = nullptr) const override;
+	Script *create_script() const override;
+	bool has_named_classes() const override { return false; }
+	bool supports_builtin_mode() const override { return false; }
+	int find_function(const String &p_function, const String &p_code) const override;
+	String make_function(const String &p_class, const String &p_name, const PoolStringArray &p_args) const override;
+	Error complete_code(const String &p_code, const String &p_path, Object *p_owner, List<ScriptCodeCompletionOption> *r_options, bool &r_force, String &r_call_hint) override;
+	void auto_indent_code(String &p_code, int p_from_line, int p_to_line) const override {}
 
-	virtual String debug_get_error() const;
-	virtual int debug_get_stack_level_count() const;
-	virtual int debug_get_stack_level_line(int p_level) const;
-	virtual String debug_get_stack_level_function(int p_level) const;
-	virtual String debug_get_stack_level_source(int p_level) const;
-	virtual void debug_get_stack_level_locals(int p_level, List<String> *p_locals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1);
-	virtual void debug_get_stack_level_members(int p_level, List<String> *p_members, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1);
-	virtual void debug_get_globals(List<String> *p_globals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1);
-	virtual String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems = -1, int p_max_depth = -1);
+	void add_global_constant(const StringName &p_variable, const Variant &p_value) override {}
 
-	virtual void reload_all_scripts();
-	virtual void reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload);
-	virtual void get_recognized_extensions(List<String> *p_extensions) const;
-	virtual void get_public_functions(List<MethodInfo> *p_functions) const;
-	virtual void get_public_constants(List<Pair<String, Variant>> *p_constants) const;
+	String debug_get_error() const override { return String(); }
+	int debug_get_stack_level_count() const override { return 0; }
+	int debug_get_stack_level_line(int p_level) const override { return 0; }
+	String debug_get_stack_level_function(int p_level) const override { return String(); }
+	String debug_get_stack_level_source(int p_level) const override { return String(); }
+	void debug_get_stack_level_locals(int p_level, List<String> *p_locals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1) override {}
+	void debug_get_stack_level_members(int p_level, List<String> *p_members, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1) override {}
+	void debug_get_globals(List<String> *p_globals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1) override {}
+	String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems = -1, int p_max_depth = -1) override { return p_expression; }
 
-	virtual void profiling_start();
-	virtual void profiling_stop();
-	virtual int profiling_get_accumulated_data(ProfilingInfo *p_info_arr, int p_info_max);
-	virtual int profiling_get_frame_data(ProfilingInfo *p_info_arr, int p_info_max);
+	void reload_all_scripts() override {}
+	void reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload) override {}
 
-	GCLScriptLanguage();
-	virtual ~GCLScriptLanguage();
+	void get_recognized_extensions(List<String> *p_extensions) const override {
+		p_extensions->push_back("gcsf");
+		p_extensions->push_back("gclib");
+	}
+	void get_public_functions(List<MethodInfo> *p_functions) const override {}
+	void get_public_constants(List<Pair<String, Variant>> *p_constants) const override {}
+
+	void profiling_start() override {}
+	void profiling_stop() override {}
+	int profiling_get_accumulated_data(ProfilingInfo *p_info_arr, int p_info_max) override { return 0; }
+	int profiling_get_frame_data(ProfilingInfo *p_info_arr, int p_info_max) override { return 0; }
 };
+
+} // namespace gcl
 
 #endif // GCL_SCRIPT_H

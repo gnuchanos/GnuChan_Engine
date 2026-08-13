@@ -1,5 +1,7 @@
 ## Dil Sözdizimi (Syntax)
 
+lexer(module) -> parser(module) -> ast(module) -> ir(module)
+
 ### comment
 
 ```
@@ -92,7 +94,7 @@ type identifier1, identifier1, identifier1 = variable;
 void print_this_global() {
     global gx;
 
-    printf("Global GX: %d \n", gx);
+    PrintF("Global GX: %d \n", gx);
 }
 
 void print_this_local() {
@@ -100,7 +102,7 @@ void print_this_local() {
 
     int gx = 31;
 
-    printf("local GX: %d \n", gx);
+    PrintF("local GX: %d \n", gx);
 }
 
 int gx = 10;
@@ -113,51 +115,48 @@ pointer ->, &
 
 ## Veri Tipleri (Types)
 
-### PRINTF
+### PrintF
 
 ```
-printf("format", arguments...);
+PrintF("format", arguments...);
 ```
 
 ```
 // Signed integers
-printf("int8:        %d\n", number1);
-printf("int16:       %d\n", number2);
-printf("int32:       %d\n", number3);
-printf("int64:       %lld\n", number4);
-printf("int128:      %lld\n", number5);
+PrintF("int8:        %d\n", number0);
+PrintF("int8:        %d\n", number1);
+PrintF("int16:       %d\n", number2);
+PrintF("int32:       %d\n", number3);
+PrintF("int64:       %lld\n", number4);
+PrintF("int128:      %lld\n", number5);
 
-printf("short:       %hd\n", number6);
-printf("int:         %d\n", number7);
-printf("long:        %ld\n", number8);
-printf("long long:   %lld\n", number9);
+PrintF("short:       %hd\n", number6);
+PrintF("int:         %d\n", number7);
+PrintF("long:        %ld\n", number8);
+PrintF("long long:   %lld\n", number9);
 
 // Unsigned integers
-printf("uint8:             %u\n", unumber1);
-printf("uint16:            %u\n", unumber2);
-printf("uint32:            %u\n", unumber3);
-printf("uint64:            %llu\n", unumber4);
-printf("uint128:           %llu\n", unumber5);
+PrintF("uint8:             %u\n", unumber1);
+PrintF("uint16:            %u\n", unumber2);
+PrintF("uint32:            %u\n", unumber3);
+PrintF("uint64:            %llu\n", unumber4);
+PrintF("uint128:           %llu\n", unumber5);
 
-printf("unsigned short:    %hu\n", unumber6);
-printf("unsigned int:      %u\n", unumber7);
-printf("unsigned long:     %lu\n", unumber8);
-printf("unsigned long long:%llu\n", unumber9);
+PrintF("unsigned short:    %hu\n", unumber6);
+PrintF("unsigned int:      %u\n", unumber7);
+PrintF("unsigned long:     %lu\n", unumber8);
+PrintF("unsigned long long:%llu\n", unumber9);
 
 // Floating point
-printf("float16:       %f\n", fnumber1);
-printf("float32:       %f\n", fnumber2);
-printf("float64:       %f\n", fnumber3);
-printf("float128:      %Lf\n", fnumber4);
+PrintF("float16:       %f\n", fnumber1);
+PrintF("float32:       %f\n", fnumber2);
+PrintF("float64:       %f\n", fnumber3);
+PrintF("float128:      %Lf\n", fnumber4);
 
-printf("float:         %f\n", fnumber5);
-printf("double:        %f\n", fnumber6);
-printf("long double:   %Lf\n", fnumber7);
+PrintF("float:         %f\n", fnumber5);
+PrintF("double:        %f\n", fnumber6);
+PrintF("long double:   %Lf\n", fnumber7);
 
-
-```
-
-```
 Width & Precision
 -----------------
 %5d    Minimum width
@@ -565,7 +564,7 @@ int8, int16, int32, int64, int128
 uint8, uint16, uint32, uint64, uint128
 float16, float32, float64, float128
 gcChar, gcMalloc, public, private, global, inline, tuple, dict
-printf, scanf, malloc, free
+PrintF, malloc, free
 #include, #lib, #extern, #register
 #define, #undef, #warning, #error, #debug
 #ifdef, #ifndef, #if, #elif, #else, #endif
@@ -621,7 +620,7 @@ class CHILD(FATHER) {
         gcChar what = FATHER.Call;
 
         if (what == "where are you") {
-            printf("i'm coming father!! \n");
+            PrintF("i'm coming father!! \n");
         }
 
     }
@@ -635,9 +634,9 @@ class CHILD(FATHER) {
 FATHER ThisFather = FATHER #// no head means ()
 CHILD  ThisChild  = CHILD(ThisFather)
 
-printf("FATHER CALL: %s", ThisFather.Call);
+PrintF("FATHER CALL: %s", ThisFather.Call);
 
-printf("Child Name: %s \n", ThisChild.name);
-printf("Child Name: %d \n", ThisChild.age);
-printf("FATHER CALL From Child No Header: %s \n", ThisChild.Call);
-printf("FATHER CALL From Child With Header: %s \n", ThisChild.talk());
+PrintF("Child Name: %s \n", ThisChild.name);
+PrintF("Child Name: %d \n", ThisChild.age);
+PrintF("FATHER CALL From Child No Header: %s \n", ThisChild.Call);
+PrintF("FATHER CALL From Child With Header: %s \n", ThisChild.talk());

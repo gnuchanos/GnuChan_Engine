@@ -1,10 +1,18 @@
 #!/usr/bin/env python
 
 Import("env")
-Import("env_modules")
 
-env_gcl = env_modules.Clone()
-
-module_obj = []
-env_gcl.add_source_files(module_obj, "*.cpp")
-env.modules_sources += module_obj
+env.add_source_files(env.modules_sources, "*.cpp")
+# GCL pipeline modules: lexer -> parser -> ast -> ir.
+# lexer: comment stage is live; tokens stage is a skeleton.
+env.add_source_files(env.modules_sources, "lexer/*.cpp")
+# parser / ast / ir: skeletons, ready to be filled in.
+env.add_source_files(env.modules_sources, "parser/*.cpp")
+env.add_source_files(env.modules_sources, "ast/*.cpp")
+env.add_source_files(env.modules_sources, "ir/*.cpp")
+# autocomplete: editor code completion (self. extern + variables).
+env.add_source_files(env.modules_sources, "autocomplete/*.cpp")
+# executor: minimal interpreter (printf/print + variable assignments).
+env.add_source_files(env.modules_sources, "executor/*.cpp")
+# highlight: editor syntax highlighter (printf/print, %spec, values distinct colors).
+env.add_source_files(env.modules_sources, "Highlight/*.cpp")

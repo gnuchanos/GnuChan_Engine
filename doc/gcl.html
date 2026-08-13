@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCL — GnuChan Language Dokümantasyonu</title>
+<style>
+  :root {
+    --bg0: #0b0614;
+    --bg1: #120b22;
+    --bg2: #1a1130;
+    --bg3: #241741;
+    --border: #362256;
+    --purple: #a855f7;
+    --violet: #8b5cf6;
+    --deep: #6d28d9;
+    --lavender: #e9d5ff;
+    --lav-light: #f3e8ff;
+    --muted: #a78bda;
+    --pink: #f0abfc;
+    --soft: #c4b5fd;
+    --green: #86efac;
+    --yellow: #fde68a;
+    --red: #fca5a5;
+    --code-bg: #0f081d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg0);
+    color: var(--lavender);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.65;
+  }
+
+  /* ================= SOL PANEL ================= */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 280px;
+    height: 100vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #160d28, #120b22);
+    border-right: 1px solid var(--border);
+    padding: 22px 0 40px;
+    z-index: 50;
+  }
+  .sidebar .brand {
+    padding: 0 22px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .sidebar .brand .logo {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--lav-light);
+    letter-spacing: 1px;
+  }
+  .sidebar .brand .logo span { color: var(--purple); }
+  .sidebar .brand .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .sidebar .group {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--purple);
+    padding: 16px 22px 6px;
+  }
+  .sidebar a {
+    display: block;
+    font-size: 13.5px;
+    color: var(--soft);
+    text-decoration: none;
+    padding: 6px 22px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  .sidebar a:hover {
+    color: var(--lav-light);
+    background: var(--bg2);
+    border-left-color: var(--purple);
+  }
+  .sidebar .foot {
+    margin-top: 26px;
+    padding: 14px 22px 0;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .sidebar .foot b { color: var(--purple); }
+
+  /* ================= IÇERİK ================= */
+  main {
+    margin-left: 280px;
+    max-width: 900px;
+    padding: 40px 44px 90px;
+  }
+  section { margin-bottom: 60px; }
+
+  h1 {
+    font-size: 30px;
+    color: var(--lav-light);
+    margin-bottom: 10px;
+  }
+  h1 .grad {
+    background: linear-gradient(90deg, var(--purple), var(--pink), var(--violet));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  h2 {
+    font-size: 22px;
+    color: var(--lav-light);
+    margin: 0 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+    position: relative;
+  }
+  h2::before {
+    content: "";
+    position: absolute; left: 0; bottom: -2px;
+    width: 70px; height: 2px;
+    background: linear-gradient(90deg, var(--purple), transparent);
+  }
+  h3 {
+    font-size: 15.5px;
+    color: var(--pink);
+    margin: 30px 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  p { margin: 10px 0; }
+
+  /* ---------- kod blokları ---------- */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 14px 0;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--lav-light);
+    box-shadow: 0 4px 18px rgba(109,40,217,.12);
+  }
+  code {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 13px;
+  }
+  /* satır listelerindeki inline kod parçası */
+  .ln code {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 7px;
+    color: var(--pink);
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  /* ---------- satır listeleri ---------- */
+  .ln {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #221636;
+    border-radius: 6px;
+  }
+  .ln:hover { background: var(--bg2); }
+  .ln .name { min-width: 190px; flex-shrink: 0; }
+  .ln .name code { font-size: 13px; color: var(--lav-light); background: none; border: none; padding: 0; }
+  .ln .desc { font-size: 13.5px; color: var(--lavender); }
+  .ln .desc code { color: var(--green); }
+
+  /* ---------- kutu ---------- */
+  .box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    padding: 16px 18px;
+    margin: 16px 0;
+  }
+  .box.warn { border-left: 3px solid var(--yellow); }
+  .box.info { border-left: 3px solid var(--purple); }
+  .box .title {
+    font-weight: 700;
+    color: var(--lav-light);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13.5px;
+  }
+  .box.warn .title { color: var(--yellow); }
+  .box.info .title { color: var(--pink); }
+  .box p { font-size: 13.5px; margin: 6px 0; }
+
+  footer {
+    margin-left: 280px;
+    border-top: 1px solid var(--border);
+    background: var(--bg1);
+    padding: 22px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  footer b { color: var(--purple); }
+
+  /* ---------- syntax renkleri ---------- */
+  .c  { color: #7d6b9e; font-style: italic; }
+  .k  { color: var(--purple); font-weight: 600; }
+  .s  { color: var(--green); }
+  .n  { color: var(--yellow); }
+  .f  { color: var(--pink); }
+  .t  { color: var(--soft); }
+  .d  { color: var(--red); }
+  .v  { color: var(--lav-light); }
+
+  @media (max-width: 860px) {
+    .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { margin-left: 0; padding: 24px 18px 60px; }
+    footer { margin-left: 0; }
+    .ln { flex-direction: column; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= SOL PANEL ================= -->
+<nav class="sidebar">
+  <div class="brand">
+    <div class="logo">GnuChan<span>IDE</span> · GCL</div>
+    <div class="sub">GnuChan Language v0.1</div>
+  </div>
+
+  <div class="group">Dil</div>
+  <a href="#giris">Giriş</a>
+  <a href="#syntax">Sözdizimi</a>
+  <a href="#tipler">Veri Tipleri</a>
+  <a href="#operatorler">Operatörler</a>
+  <a href="#printf">PrintF</a>
+
+  <div class="group">Yapılar</div>
+  <a href="#kontrol">Kontrol Akışı</a>
+  <a href="#fonksiyon">Fonksiyonlar</a>
+  <a href="#typedef">typedef</a>
+  <a href="#enum">enum</a>
+  <a href="#struct">struct</a>
+  <a href="#tuple">tuple</a>
+  <a href="#dict">dict</a>
+  <a href="#class">class</a>
+
+  <div class="group">Sistem</div>
+  <a href="#diziler">Diziler & Bellek</a>
+  <a href="#preprocessor">Preprocessor</a>
+
+  <div class="group">Motor</div>
+  <a href="#extern">@extern & Node</a>
+  <a href="#node-turleri">Node Türleri</a>
+  <a href="#material">Material</a>
+  <a href="#hazir">Hazır Fonksiyonlar</a>
+
+  <div class="foot">
+    LICENSE: <b>Zlib</b><br>
+    Kaynak: <code>gcl.md</code> · <code>gcl_language.md</code>
+  </div>
+</nav>
+
+<main>
+
+<!-- ================= GIRIS ================= -->
+<section id="giris">
+  <h1><span class="grad">GCL — GnuChan Language</span></h1>
+  <p>GCL, GnuChan Engine'in oyun betik dilidir. C benzeri sözdizimine sahiptir; katmanlı tip sistemi, class bildirimleri, güvenli dizi yönetimi ve doğrudan node erişimi sunar.</p>
+  <p>Uzantı: <code>.gcsf</code> (script) · <code>.gclib</code> (kütüphane) · Derleme: <code>py makefile.py -j8</code></p>
+
+  <h3>İlk Betik</h3>
+<pre><code><span class="c"># GnuChan'da merhaba dünya</span>
+<span class="k">void</span> <span class="f">Ready</span>() {
+    <span class="f">PrintF</span>(<span class="s">"Merhaba GnuChan! FPS: %d\n"</span>, <span class="f">Engine</span>.GetFPS);
+}</code></pre>
+</section>
+
+<!-- ================= SYNTAX ================= -->
+<section id="syntax">
+  <h2>Sözdizimi</h2>
+
+  <h3>Yorumlar</h3>
+<pre><code><span class="c"># tek satır yorum</span>
+
+<span class="c">#| çok satırlı</span>
+<span class="c">   yorum bloğu</span>
+<span class="c">   |#</span></code></pre>
+
+  <h3>Include ve Kütüphane</h3>
+<pre><code><span class="d">#include</span> <span class="s">"script.gcsf"</span>   <span class="c"># dosya ekle</span>
+<span class="d">#include</span> <span class="s"><script.gcsf></span>   <span class="c"># sistem yolu</span>
+
+<span class="d">#lib</span> <span class="s">"library.gclib"</span>     <span class="c"># modül ekle</span>
+
+<span class="d">#extern</span> <span class="s">"raylib.dll"</span>    <span class="c"># .so / .dll / .a</span>
+    <span class="d">#register</span> <span class="k">void</span> <span class="f">InitWindow</span>(<span class="k">int</span> w, <span class="k">int</span> h, <span class="k">const char</span> *t);</code></pre>
+
+  <h3>Değişken Bildirimi</h3>
+<pre><code><span class="k">public</span> <span class="t">int</span> <span class="v">global_var</span> = <span class="n">10</span>;    <span class="c"># her yerden erişilir</span>
+<span class="k">private</span> <span class="t">int</span> <span class="v">local_var</span> = <span class="n">5</span>;     <span class="c"># yalnızca klasör içinde</span>
+<span class="k">const</span> <span class="t">int</span> <span class="v">sabit</span> = <span class="n">7</span>;
+
+<span class="t">int</span> <span class="v">a</span>, <span class="v">b</span>, <span class="v">c</span> = <span class="n">5</span>;             <span class="c"># çoklu bildirim</span>
+
+<span class="t">int</span> <span class="v">EDSF</span> = <span class="n">31</span>                  <span class="c"># noktalı virgül opsiyonel</span>
+<span class="t">float</span> <span class="v">ABCD</span> = <span class="n">30.30000</span>;
+
+<span class="k">inline</span> <span class="t">int</span> <span class="v">gx</span>;                  <span class="c"># yerel kapsam</span>
+<span class="k">global</span> <span class="t">int</span> <span class="v">gy</span>;                  <span class="c"># global kapsam</span></code></pre>
+</section>
+
+<!-- ================= TIPLER ================= -->
+<section id="tipler">
+  <h2>Veri Tipleri</h2>
+
+  <h3>İşaretli Tamsayılar</h3>
+  <div class="ln"><div class="name"><code>short</code></div><div class="desc">kısa tamsayı — <code>short n = 10;</code></div></div>
+  <div class="ln"><div class="name"><code>int</code></div><div class="desc">normal tamsayı — <code>int n = 10000;</code></div></div>
+  <div class="ln"><div class="name"><code>long</code></div><div class="desc">uzun tamsayı — <code>long n = 100000;</code></div></div>
+  <div class="ln"><div class="name"><code>long long</code></div><div class="desc">geniş tamsayı — <code>long long n = 1000000;</code></div></div>
+  <div class="ln"><div class="name"><code>int8</code></div><div class="desc">8-bit tamsayı — <code>int8 n = 10;</code></div></div>
+  <div class="ln"><div class="name"><code>int16</code></div><div class="desc">16-bit tamsayı — <code>int16 n = 100;</code></div></div>
+  <div class="ln"><div class="name"><code>int32</code></div><div class="desc">32-bit tamsayı — <code>int32 n = 1000;</code></div></div>
+  <div class="ln"><div class="name"><code>int64</code></div><div class="desc">64-bit tamsayı — <code>int64 n = 10000;</code></div></div>
+  <div class="ln"><div class="name"><code>int128</code></div><div class="desc">128-bit tamsayı — <code>int128 n = 100000;</code></div></div>
+
+  <h3>İşaretsiz Tamsayılar</h3>
+  <div class="ln"><div class="name"><code>unsigned short</code></div><div class="desc">işaretsiz kısa — <code>unsigned short n = 10;</code></div></div>
+  <div class="ln"><div class="name"><code>unsigned int</code></div><div class="desc">işaretsiz tam — <code>unsigned int n = 100;</code></div></div>
+  <div class="ln"><div class="name"><code>unsigned long</code></div><div class="desc">işaretsiz uzun — <code>unsigned long n = 1000;</code></div></div>
+  <div class="ln"><div class="name"><code>unsigned long long</code></div><div class="desc">işaretsiz geniş — <code>unsigned long long n = 10000;</code></div></div>
+  <div class="ln"><div class="name"><code>uint8</code></div><div class="desc">8-bit işaretsiz — <code>uint8 n = 10;</code></div></div>
+  <div class="ln"><div class="name"><code>uint16</code></div><div class="desc">16-bit işaretsiz — <code>uint16 n = 100;</code></div></div>
+  <div class="ln"><div class="name"><code>uint32</code></div><div class="desc">32-bit işaretsiz — <code>uint32 n = 1000;</code></div></div>
+  <div class="ln"><div class="name"><code>uint64</code></div><div class="desc">64-bit işaretsiz — <code>uint64 n = 10000;</code></div></div>
+  <div class="ln"><div class="name"><code>uint128</code></div><div class="desc">128-bit işaretsiz — <code>uint128 n = 100000;</code></div></div>
+
+  <h3>Ondalıklı Sayılar</h3>
+  <div class="ln"><div class="name"><code>float</code></div><div class="desc">32-bit kesir — <code>float n = 10.30;</code></div></div>
+  <div class="ln"><div class="name"><code>double</code></div><div class="desc">64-bit kesir — <code>double n = 10.3000;</code></div></div>
+  <div class="ln"><div class="name"><code>long double</code></div><div class="desc">geniş kesir — <code>long double n = 10.30000;</code></div></div>
+  <div class="ln"><div class="name"><code>float16</code></div><div class="desc">16-bit kesir — <code>float16 n = 10.30;</code></div></div>
+  <div class="ln"><div class="name"><code>float32</code></div><div class="desc">32-bit kesir — <code>float32 n = 10.300;</code></div></div>
+  <div class="ln"><div class="name"><code>float64</code></div><div class="desc">64-bit kesir — <code>float64 n = 10.3000;</code></div></div>
+  <div class="ln"><div class="name"><code>float128</code></div><div class="desc">128-bit kesir — <code>float128 n = 10.30000;</code></div></div>
+
+  <h3>Karakter ve Mantık</h3>
+  <div class="ln"><div class="name"><code>char</code></div><div class="desc">1 bayt karakter — <code>char c = 'a';</code></div></div>
+  <div class="ln"><div class="name"><code>gcChar</code></div><div class="desc">UTF-8 karakter — <code>gcChar c = 'a';</code></div></div>
+  <div class="ln"><div class="name"><code>gcChar []</code></div><div class="desc">stack string (sabit) — <code>gcChar s[] = "merhaba";</code></div></div>
+  <div class="ln"><div class="name"><code>gcChar *</code></div><div class="desc">heap string (mutable) — <code>gcChar *s = "merhaba";</code></div></div>
+  <div class="ln"><div class="name"><code>char *</code></div><div class="desc">null pointer — <code>char *p = null;</code></div></div>
+  <div class="ln"><div class="name"><code>bool</code></div><div class="desc">mantıksal — <code>bool ok = true;</code></div></div>
+  <div class="ln"><div class="name"><code>void</code></div><div class="desc">değer döndürmeyen</div></div>
+
+  <div class="box info">
+    <span class="title">String Güvenliği</span>
+    <p>Heap string'ler program sonunda otomatik serbest bırakılır. Elle serbest bırakma: <code>TEXT.free()</code>. Kullanmadan önce kontrol: <code>if (TEXT != null) { }</code>.</p>
+  </div>
+</section>
+
+<!-- ================= OPERATÖRLER ================= -->
+<section id="operatorler">
+  <h2>Operatörler</h2>
+
+  <h3>Aritmetik</h3>
+  <div class="ln"><div class="name"><code>+</code></div><div class="desc">toplama — <code>a + b</code></div></div>
+  <div class="ln"><div class="name"><code>-</code></div><div class="desc">çıkarma — <code>a - b</code></div></div>
+  <div class="ln"><div class="name"><code>*</code></div><div class="desc">çarpma — <code>a * b</code></div></div>
+  <div class="ln"><div class="name"><code>/</code></div><div class="desc">bölme — <code>a / b</code></div></div>
+  <div class="ln"><div class="name"><code>%</code></div><div class="desc">kalan — <code>a % b</code></div></div>
+  <div class="ln"><div class="name"><code>++</code></div><div class="desc">artırma — <code>i++</code> veya <code>++i</code></div></div>
+  <div class="ln"><div class="name"><code>--</code></div><div class="desc">azaltma — <code>i--</code> veya <code>--i</code></div></div>
+  <div class="ln"><div class="name"><code>+= -= *= /= %=</code></div><div class="desc">bileşik atama — <code>x += 2</code></div></div>
+
+  <h3>Karşılaştırma</h3>
+  <div class="ln"><div class="name"><code>==</code></div><div class="desc">eşit mi</div></div>
+  <div class="ln"><div class="name"><code>!=</code></div><div class="desc">eşit değil mi</div></div>
+  <div class="ln"><div class="name"><code>></code></div><div class="desc">büyük mü</div></div>
+  <div class="ln"><div class="name"><code><</code></div><div class="desc">küçük mü</div></div>
+  <div class="ln"><div class="name"><code>>=</code></div><div class="desc">büyük veya eşit mi</div></div>
+  <div class="ln"><div class="name"><code><=</code></div><div class="desc">küçük veya eşit mi</div></div>
+
+  <h3>Mantık</h3>
+  <div class="ln"><div class="name"><code>&&</code></div><div class="desc">ve</div></div>
+  <div class="ln"><div class="name"><code>||</code></div><div class="desc">veya</div></div>
+  <div class="ln"><div class="name"><code>!</code></div><div class="desc">değil</div></div>
+
+  <h3>Bit Operatörleri</h3>
+  <div class="ln"><div class="name"><code>&</code></div><div class="desc">bit ve</div></div>
+  <div class="ln"><div class="name"><code>|</code></div><div class="desc">bit veya</div></div>
+  <div class="ln"><div class="name"><code>^</code></div><div class="desc">bit xor</div></div>
+  <div class="ln"><div class="name"><code>~</code></div><div class="desc">bit değil</div></div>
+  <div class="ln"><div class="name"><code><<</code></div><div class="desc">sola kaydır — <code>1 << 4</code></div></div>
+  <div class="ln"><div class="name"><code>>></code></div><div class="desc">sağa kaydır</div></div>
+
+  <h3>Ternary</h3>
+  <pre><code><span class="v">sonuc</span> = (<span class="v">kosul</span>) ? <span class="v">dogru</span> : <span class="v">yanlis</span>;
+
+<span class="t">int</span> <span class="v">pick</span> = (<span class="v">EDSF</span> > <span class="n">20</span>) ? <span class="n">100</span> : <span class="n">0</span>;</code></pre>
+
+  <h3>Operator Typedef'leri</h3>
+  <div class="ln"><div class="name"><code>typedef == equals</code></div><div class="desc">eşittir — <code>10 equals 10</code></div></div>
+  <div class="ln"><div class="name"><code>typedef != notEquals</code></div><div class="desc">eşit değildir — <code>1 notEquals 2</code></div></div>
+  <div class="ln"><div class="name"><code>typedef && and</code></div><div class="desc">ve — <code>a and b</code></div></div>
+  <div class="ln"><div class="name"><code>typedef || or</code></div><div class="desc">veya — <code>a or b</code></div></div>
+  <div class="ln"><div class="name"><code>typedef ! not</code></div><div class="desc">değil — <code>not (a)</code></div></div>
+  <div class="ln"><div class="name"><code>typedef & bitAnd</code></div><div class="desc">bit ve</div></div>
+  <div class="ln"><div class="name"><code>typedef | bitOr</code></div><div class="desc">bit veya</div></div>
+  <div class="ln"><div class="name"><code>typedef ^ bitXor</code></div><div class="desc">bit xor</div></div>
+  <div class="ln"><div class="name"><code>typedef ~ bitNot</code></div><div class="desc">bit değil</div></div>
+  <div class="ln"><div class="name"><code>typedef << leftShift</code></div><div class="desc">sola kaydır</div></div>
+  <div class="ln"><div class="name"><code>typedef >> rightShift</code></div><div class="desc">sağa kaydır</div></div>
+</section>
+
+<!-- ================= PRINTF ================= -->
+<section id="printf">
+  <h2>PrintF</h2>
+
+<pre><code><span class="f">PrintF</span>(<span class="s">"format"</span>, <span class="v">arguman1</span>, <span class="v">arguman2</span>, <span class="v">...</span>);</code></pre>
+
+  <h3>Dönüşümler</h3>
+  <div class="ln"><div class="name"><code>%d</code></div><div class="desc">işaretli tamsayı ondalık — <code>PrintF("%d\n", 42);</code></div></div>
+  <div class="ln"><div class="name"><code>%i</code></div><div class="desc">işaretli tamsayı — <code>PrintF("%i\n", 42);</code></div></div>
+  <div class="ln"><div class="name"><code>%u</code></div><div class="desc">işaretsiz tamsayı — <code>PrintF("%u\n", 10);</code></div></div>
+  <div class="ln"><div class="name"><code>%x</code></div><div class="desc">hexadecimal küçük harf — <code>PrintF("%x\n", 255);</code> → <code>ff</code></div></div>
+  <div class="ln"><div class="name"><code>%X</code></div><div class="desc">hexadecimal büyük harf — <code>PrintF("%X\n", 255);</code> → <code>FF</code></div></div>
+  <div class="ln"><div class="name"><code>%o</code></div><div class="desc">octal — <code>PrintF("%o\n", 8);</code> → <code>10</code></div></div>
+  <div class="ln"><div class="name"><code>%f</code></div><div class="desc">ondalık sabit — <code>PrintF("%f\n", 3.14);</code></div></div>
+  <div class="ln"><div class="name"><code>%e</code></div><div class="desc">bilimsel küçük — <code>PrintF("%e\n", 1500.0);</code></div></div>
+  <div class="ln"><div class="name"><code>%E</code></div><div class="desc">bilimsel büyük — <code>PrintF("%E\n", 1500.0);</code></div></div>
+  <div class="ln"><div class="name"><code>%g</code></div><div class="desc">kısa gösterim</div></div>
+  <div class="ln"><div class="name"><code>%c</code></div><div class="desc">tek karakter — <code>PrintF("%c\n", 'a');</code></div></div>
+  <div class="ln"><div class="name"><code>%s</code></div><div class="desc">string — <code>PrintF("%s\n", "merhaba");</code></div></div>
+  <div class="ln"><div class="name"><code>%%</code></div><div class="desc">yüzde işareti — <code>PrintF("%%");</code> → <code>%</code></div></div>
+
+  <h3>Genişlik ve Hassasiyet</h3>
+  <div class="ln"><div class="name"><code>%5d</code></div><div class="desc">minimum 5 karakter genişlik</div></div>
+  <div class="ln"><div class="name"><code>%-5d</code></div><div class="desc">sola hizalı, 5 karakter</div></div>
+  <div class="ln"><div class="name"><code>%05d</code></div><div class="desc">sıfır dolgulu, 5 karakter</div></div>
+  <div class="ln"><div class="name"><code>%.2f</code></div><div class="desc">2 ondalık basamak</div></div>
+  <div class="ln"><div class="name"><code>%8.2f</code></div><div class="desc">8 genişlik + 2 ondalık</div></div>
+
+  <h3>Kaçış Dizileri</h3>
+  <div class="ln"><div class="name"><code>\n</code></div><div class="desc">yeni satır</div></div>
+  <div class="ln"><div class="name"><code>\t</code></div><div class="desc">sekme</div></div>
+  <div class="ln"><div class="name"><code>\r</code></div><div class="desc">satır başı</div></div>
+  <div class="ln"><div class="name"><code>\\</code></div><div class="desc">ters bölü</div></div>
+  <div class="ln"><div class="name"><code>\"</code></div><div class="desc">çift tırnak</div></div>
+  <div class="ln"><div class="name"><code>\'</code></div><div class="desc">tek tırnak</div></div>
+</section>
+
+<!-- ================= KONTROL AKISI ================= -->
+<section id="kontrol">
+  <h2>Kontrol Akışı</h2>
+
+  <h3>if — else if — elif — else</h3>
+<pre><code><span class="k">if</span> (<span class="v">EDSF</span> == <span class="n">31</span>) {
+    <span class="f">PrintF</span>(<span class="s">"IF OK\n"</span>);
+} <span class="k">else if</span> (<span class="v">EDSF</span> > <span class="n">20</span>) {
+    <span class="f">PrintF</span>(<span class="s">"> 20\n"</span>);
+} <span class="k">elif</span> (<span class="v">EDSF</span> > <span class="n">10</span>) {
+    <span class="f">PrintF</span>(<span class="s">"> 10\n"</span>);
+} <span class="k">else</span> {
+    <span class="f">PrintF</span>(<span class="s">"else\n"</span>);
+}</code></pre>
+
+  <h3>switch</h3>
+<pre><code><span class="t">int</span> <span class="v">m</span> = <span class="v">HAPPY</span>;
+<span class="k">switch</span> (<span class="v">m</span>) {
+    <span class="k">case</span> <span class="v">HAPPY</span>:
+        <span class="f">PrintF</span>(<span class="s">"HAPPY\n"</span>);
+        <span class="k">break</span>;
+    <span class="k">case</span> <span class="v">SAD</span>:
+        <span class="f">PrintF</span>(<span class="s">"SAD\n"</span>);
+        <span class="k">break</span>;
+    <span class="k">default</span>:
+        <span class="f">PrintF</span>(<span class="s">"default\n"</span>);
+        <span class="k">break</span>;
+}</code></pre>
+
+  <h3>for</h3>
+<pre><code><span class="k">for</span> (<span class="t">int</span> <span class="v">i</span> = <span class="n">0</span>; <span class="v">i</span> < <span class="n">3</span>; <span class="v">i</span>++) {
+    <span class="v">sum</span> += <span class="v">i</span>;
+}</code></pre>
+
+  <h3>while</h3>
+<pre><code><span class="k">while</span> (<span class="v">counter</span> < <span class="n">3</span>) {
+    <span class="v">counter</span>++;
+}</code></pre>
+
+  <h3>do-while</h3>
+<pre><code><span class="k">do</span> {
+    <span class="v">x</span>++;
+} <span class="k">while</span> (<span class="v">x</span> < <span class="n">10</span>);</code></pre>
+
+  <h3>Döngü Komutları</h3>
+  <div class="ln"><div class="name"><code>break</code></div><div class="desc">döngüyü bitirir</div></div>
+  <div class="ln"><div class="name"><code>continue</code></div><div class="desc">sonraki tura geçer</div></div>
+  <div class="ln"><div class="name"><code>return</code></div><div class="desc">fonksiyondan çıkar, değer döndürür</div></div>
+</section>
+
+<!-- ================= FONKSIYON ================= -->
+<section id="fonksiyon">
+  <h2>Fonksiyonlar</h2>
+
+  <h3>Bildirim</h3>
+<pre><code><span class="k">void</span> <span class="f">isim</span>(<span class="t">parametreler</span>);
+<span class="t">tip</span>   <span class="f">isim</span>(<span class="t">parametreler</span>);</code></pre>
+
+  <h3>Örnek</h3>
+<pre><code><span class="t">int</span> <span class="f">add</span>(<span class="t">int</span> <span class="v">a</span>, <span class="t">int</span> <span class="v">b</span>) {
+    <span class="k">return</span> <span class="v">a</span> + <span class="v">b</span>;
+}
+
+<span class="t">int</span> <span class="v">r</span> = <span class="f">add</span>(<span class="n">19</span>, <span class="n">23</span>);   <span class="c"># r = 42</span></code></pre>
+</section>
+
+<!-- ================= TYPEDEF ================= -->
+<section id="typedef">
+  <h2>typedef</h2>
+
+  <h3>Tip Takma Adı</h3>
+<pre><code><span class="k">typedef</span> <span class="t">int32_t</span> <span class="t">myint</span>;
+<span class="k">typedef</span> <span class="t">unsigned int</span> <span class="t">uint</span>;
+<span class="k">typedef</span> <span class="t">char*</span> <span class="t">string</span>;
+
+<span class="t">myint</span> <span class="v">mx</span> = <span class="n">42</span>;</code></pre>
+
+  <h3>Operator Typedef</h3>
+<pre><code><span class="k">typedef</span> == <span class="v">equals</span>;
+<span class="k">typedef</span> != <span class="v">notEquals</span>;
+<span class="k">typedef</span> && <span class="v">and</span>;
+<span class="k">typedef</span> || <span class="v">or</span>;
+<span class="k">typedef</span> !  <span class="v">not</span>;
+<span class="k">typedef</span> &  <span class="v">bitAnd</span>;
+<span class="k">typedef</span> |  <span class="v">bitOr</span>;
+<span class="k">typedef</span> ^  <span class="v">bitXor</span>;
+<span class="k">typedef</span> ~  <span class="v">bitNot</span>;
+<span class="k">typedef</span> << <span class="v">leftShift</span>;
+<span class="k">typedef</span> >> <span class="v">rightShift</span>;</code></pre>
+</section>
+
+<!-- ================= ENUM ================= -->
+<section id="enum">
+  <h2>enum</h2>
+<pre><code><span class="k">enum</span> <span class="t">Color</span> {
+    <span class="v">RED</span>,
+    <span class="v">GREEN</span>,
+    <span class="v">BLUE</span>
+};
+
+<span class="k">enum</span> <span class="t">Color</span> <span class="v">_RED</span> = <span class="v">RED</span>;   <span class="c"># RED = 0</span></code></pre>
+
+  <h3>rename ile</h3>
+<pre><code><span class="k">enum</span> <span class="v">Mood</span> { <span class="v">HAPPY</span>, <span class="v">SAD</span>, <span class="v">ANGRY</span> };</code></pre>
+</section>
+
+<!-- ================= STRUCT ================= -->
+<section id="struct">
+  <h2>struct</h2>
+<pre><code><span class="k">struct</span> <span class="t">Player</span> {
+    <span class="t">char</span>  <span class="v">name</span>[<span class="n">32</span>];
+    <span class="t">int</span>   <span class="v">health</span>;
+    <span class="t">float</span> <span class="v">speed</span>;
+};
+
+<span class="t">Player</span> <span class="v">thisPlayer</span> = {
+    .<span class="v">name</span>   = <span class="s">"GnuChanOS"</span>,
+    .<span class="v">health</span> = <span class="n">100</span>,
+    .<span class="v">speed</span>  = <span class="n">20</span>
+};
+
+<span class="f">PrintF</span>(<span class="s">"%s\n"</span>, <span class="v">thisPlayer</span>.name);</code></pre>
+
+  <h3>typedef struct</h3>
+<pre><code><span class="k">typedef</span> <span class="k">struct</span> <span class="t">Player</span> {
+    <span class="t">char</span> <span class="v">name</span>[<span class="n">32</span>];
+    <span class="t">int</span>  <span class="v">health</span>;
+    <span class="t">float</span> <span class="v">speed</span>;
+} <span class="t">Player2</span>;
+
+<span class="t">Player2</span> <span class="v">p1</span> = { .<span class="v">name</span> = <span class="s">"bob"</span>, .<span class="v">health</span> = <span class="n">100</span>, .<span class="v">speed</span> = <span class="n">20</span> };</code></pre>
+</section>
+
+<!-- ================= TUPLE ================= -->
+<section id="tuple">
+  <h2>tuple</h2>
+  <p>Farklı tipleri tek kapta tutar. Elemanlara indeksle erişilir.</p>
+<pre><code><span class="t">tuple</span> <span class="v">mix</span> = (<span class="s">'a'</span>, <span class="s">"half life 3"</span>, <span class="n">10</span>, <span class="n">300.2000</span>, <span class="n">33</span>);
+
+<span class="f">PrintF</span>(<span class="s">"%s\n"</span>, <span class="v">mix</span>[<span class="n">1</span>]);        <span class="c"># half life 3</span>
+<span class="f">PrintF</span>(<span class="s">"%f\n"</span>, <span class="v">mix</span>[<span class="n">3</span>]);        <span class="c"># 300.2</span></code></pre>
+</section>
+
+<!-- ================= DICT ================= -->
+<section id="dict">
+  <h2>dict</h2>
+  <p>İsimlendirilmiş alanlarla hızlı obje üretimi.</p>
+<pre><code><span class="t">dict</span> <span class="v">player</span> = {
+    <span class="t">gcChar</span> <span class="v">name</span>  : <span class="s">"gnuchanos"</span>,
+    <span class="t">Vector2</span> <span class="v">pos</span>  : {<span class="n">300</span>, <span class="n">300</span>},
+    <span class="t">int8</span> <span class="v">scale</span>   : <span class="n">30</span>,
+    <span class="t">gcChar</span> <span class="v">faves</span>[] : {<span class="s">"half life 3"</span>, <span class="s">"portal"</span>}
+};
+
+<span class="f">PrintF</span>(<span class="s">"%s %d\n"</span>, <span class="v">player</span>.name, <span class="v">player</span>.scale);</code></pre>
+</section>
+
+<!-- ================= CLASS ================= -->
+<section id="class">
+  <h2>class</h2>
+
+  <h3>head'siz class</h3>
+<pre><code><span class="k">class</span> <span class="t">no_head</span>() {
+    <span class="k">void</span> <span class="f">call</span>() {}
+}
+
+<span class="t">no_head</span> <span class="v">x</span> = <span class="t">no_head</span>;
+<span class="v">x</span>.<span class="f">call</span>();</code></pre>
+
+  <h3>head'li class</h3>
+<pre><code><span class="k">class</span> <span class="t">with_head</span>() {
+    <span class="k">void</span> <span class="f">head</span>() {
+        <span class="t">int</span> <span class="v">age</span> = <span class="n">30</span>;
+    }
+    <span class="k">void</span> <span class="f">call</span>() {}
+}
+
+<span class="t">with_head</span> <span class="v">y</span> = <span class="t">with_head</span>;
+<span class="f">PrintF</span>(<span class="s">"%d\n"</span>, <span class="v">y</span>.age);   <span class="c"># head alanı</span></code></pre>
+
+  <h3>@return Metodu</h3>
+<pre><code><span class="k">class</span> <span class="t">FATHER</span>() {
+    <span class="k">@return</span>
+    <span class="t">gcChar</span> <span class="f">Call</span>() {
+        <span class="k">return</span> <span class="s">"where are you"</span>;
+    }
+
+    <span class="k">@return</span>
+    <span class="t">int</span> <span class="f">Age</span>() {
+        <span class="k">return</span> <span class="n">55</span>;
+    }
+}
+
+<span class="t">FATHER</span> <span class="v">ThisFather</span> = <span class="t">FATHER</span>;
+<span class="f">PrintF</span>(<span class="s">"%s\n"</span>, <span class="v">ThisFather</span>.Call);   <span class="c"># parantezsiz çağrı</span>
+<span class="f">PrintF</span>(<span class="s">"%d\n"</span>, <span class="v">ThisFather</span>.Age);    <span class="c"># 55</span></code></pre>
+
+  <h3>Kalıtım</h3>
+<pre><code><span class="k">class</span> <span class="t">CHILD</span>(<span class="t">FATHER</span>) {
+    <span class="k">void</span> <span class="f">head</span>(<span class="t">gcChar</span> <span class="v">who</span>) {
+        <span class="t">gcChar</span> <span class="v">name</span> = <span class="v">who</span>;
+    }
+
+    <span class="k">void</span> <span class="f">talk</span>() {
+        <span class="f">PrintF</span>(<span class="s">"child talks!\n"</span>);
+    }
+}
+
+<span class="t">CHILD</span> <span class="v">ThisChild</span> = <span class="t">CHILD</span>(<span class="s">"ali"</span>);
+<span class="v">ThisChild</span>.<span class="f">talk</span>();
+<span class="f">PrintF</span>(<span class="s">"%s\n"</span>, <span class="v">ThisChild</span>.Call);   <span class="c"># miras: FATHER.Call</span></code></pre>
+</section>
+
+<!-- ================= DIZILER ================= -->
+<section id="diziler">
+  <h2>Diziler & Bellek</h2>
+
+  <h3>Vanilla C dizileri</h3>
+<pre><code><span class="t">char</span> <span class="v">alphabet</span>[] = {<span class="s">'a'</span>, <span class="s">'b'</span>, <span class="s">'c'</span>};
+<span class="t">char</span> <span class="v">game</span>[]     = <span class="s">"Half Life 3"</span>;
+
+<span class="t">char</span> <span class="v">games</span>[][<span class="n">32</span>] = {
+    <span class="s">"half life 3"</span>,
+    <span class="s">"left 4 dead 3"</span>
+};
+
+<span class="t">char</span> ***<span class="v">games</span> = <span class="f">malloc</span>(<span class="k">sizeof</span>(<span class="t">char</span> ***) * <span class="n">4</span>);  <span class="c"># 3D malloc</span></code></pre>
+
+  <h3>GCL @N boyut sistemi</h3>
+<pre><code><span class="t">gcChar</span> <span class="v">alphabet</span>[] <span class="k">@1</span> = {<span class="s">'a'</span>, <span class="s">'b'</span>, <span class="s">'c'</span>};
+
+<span class="t">gcChar</span> <span class="v">gamesgames</span>[] <span class="k">@3</span> = {
+    { <span class="s">"game 0"</span>, { <span class="s">"info"</span>, { <span class="s">"Half-Life"</span>,      <span class="n">1998</span>, <span class="n">10</span> } } },
+    { <span class="s">"game 1"</span>, { <span class="s">"info"</span>, { <span class="s">"Portal"</span>,         <span class="n">2007</span>, <span class="n">10</span> } } },
+    { <span class="s">"game 2"</span>, { <span class="s">"info"</span>, { <span class="s">"Counter-Strike"</span>,  <span class="n">2000</span>,  <span class="n">9</span> } } }
+};</code></pre>
+
+  <h3>gcMalloc</h3>
+<pre><code><span class="t">Player</span> *<span class="v">Player_List</span> = <span class="f">gcMalloc</span>(reserve=<span class="n">MAX_PLAYER</span>, extra=<span class="n">10</span>);
+<span class="c"># kapasite dolunca +10 ekler: 10 → 20 → 30 → ...</span>
+<span class="c"># elle free() gerekmez, program sonunda otomatik temizlenir.</span></code></pre>
+
+  <div class="box warn">
+    <span class="title">Bellek Kuralları</span>
+    <p>malloc boyutu kaydedilir; limit aşılınca otomatik genişletilir ve <code>#warning</code> basılır.</p>
+    <p><code>free()</code> çift çağrılırsa <code>#warning</code>.</p>
+    <p><code>free()</code> sonrası değişken otomatik <code>null</code> olur.</p>
+  </div>
+</section>
+
+<!-- ================= PREPROCESSOR ================= -->
+<section id="preprocessor">
+  <h2>Preprocessor</h2>
+
+  <h3>Makro</h3>
+  <div class="ln"><div class="name"><code>#define</code></div><div class="desc">makro tanımlar — <code>#define MAX_PLAYER 10</code></div></div>
+  <div class="ln"><div class="name"><code>#undef</code></div><div class="desc">makro siler — <code>#undef MAX_PLAYER</code></div></div>
+  <div class="ln"><div class="name"><code>#ifdef</code></div><div class="desc">tanımlıysa</div></div>
+  <div class="ln"><div class="name"><code>#ifndef</code></div><div class="desc">tanımlı değilse</div></div>
+  <div class="ln"><div class="name"><code>#if</code></div><div class="desc">koşul — <code>#if windows</code></div></div>
+  <div class="ln"><div class="name"><code>#elif</code></div><div class="desc">aksi koşul</div></div>
+  <div class="ln"><div class="name"><code>#else</code></div><div class="desc">aksi</div></div>
+  <div class="ln"><div class="name"><code>#endif</code></div><div class="desc">bölge kapatır</div></div>
+
+  <h3>Örnek</h3>
+<pre><code><span class="d">#define</span> <span class="v">MAX_PLAYER</span> <span class="n">10</span>
+
+<span class="d">#ifdef</span> <span class="v">DEBUG</span>
+    <span class="f">PrintF</span>(<span class="s">"debug build\n"</span>);
+<span class="d">#endif</span>
+
+<span class="d">#if</span> windows
+    <span class="f">PrintF</span>(<span class="s">"windows\n"</span>);
+<span class="d">#elif</span> linux
+    <span class="f">PrintF</span>(<span class="s">"linux\n"</span>);
+<span class="d">#else</span>
+    <span class="f">PrintF</span>(<span class="s">"other\n"</span>);
+<span class="d">#endif</span></code></pre>
+
+  <h3>Mesajlar</h3>
+  <div class="ln"><div class="name"><code>#warning</code></div><div class="desc">sarı uyarı — <code>#warning "text"</code></div></div>
+  <div class="ln"><div class="name"><code>#error</code></div><div class="desc">kırmızı hata — <code>#error "ERROR!!"</code></div></div>
+  <div class="ln"><div class="name"><code>#debug</code></div><div class="desc">mavi mesaj — <code>#debug "message"</code></div></div>
+</section>
+
+<!-- ================= EXTERN ================= -->
+<section id="extern">
+  <h2>@extern & Node Erişimi</h2>
+
+  <div class="box info">
+    <span class="title">Erişim Kuralı</span>
+    <p><code>self.</code> → @extern node'unun orijinal parametreleri (Position, Name, GetNode, Free).</p>
+    <p><code>self.Raycast.</code> → Raycast node'una gider; sonrası o node'un parametreleri.</p>
+    <p><code>self.Raycast.GetNode</code> → raycast'in tuttuğu node.</p>
+  </div>
+
+  <h3>Otomatik Tamamlama</h3>
+  <div class="ln"><div class="name"><code>self.</code> (FPSController)</div><div class="desc">MoveSpeed, DuckSpeed, RunSpeed, JumpHeight, Gravity, IsRunning, Raycast, Camera, Head</div></div>
+  <div class="ln"><div class="name"><code>self.</code> (Spatial)</div><div class="desc">Position, Rotation, Scale, GetNode, Find, Hide, Show, Free, Enable, Disable</div></div>
+  <div class="ln"><div class="name"><code>self.Raycast.</code></div><div class="desc">IsColliding, GetBodyName, length, Skip, SkipList, GetNode, Free</div></div>
+  <div class="ln"><div class="name"><code>self.Camera.</code></div><div class="desc">Fov, MouseSpeed, HeadBob, HeadBobSpeed, HeadBobAmount, RunFovChange, GetNode</div></div>
+  <div class="ln"><div class="name"><code>Input.</code></div><div class="desc">IsPressed, IsUp, IsDown</div></div>
+  <div class="ln"><div class="name"><code>Engine.</code></div><div class="desc">GetFPS, SetFPS, GetScreenSize, GetWindowSize</div></div>
+
+  <div class="box warn">
+    <span class="title">Yanlış Kullanımlar</span>
+    <p><code>self.Material</code> ❌ · <code>self.Name</code> ❌ · <code>self.Childs</code> ❌ · <code>self.GetChild</code> ❌</p>
+    <p>Doğrusu: <code>self.GetNode("...").</code> veya <code>self.GetNode("...").Find("x").</code></p>
+  </div>
+
+  <h3>Örnek</h3>
+<pre><code><span class="t">NODE</span> <span class="v">REF</span> = <span class="f">GetNode</span>(<span class="s">"araba"</span>);
+
+<span class="v">REF</span>.GetChild.<span class="f">Find</span>(<span class="s">"ali"</span>).Free
+<span class="v">REF</span>.GetChild.<span class="f">Find</span>(<span class="s">"ali"</span>).Hide
+<span class="v">REF</span>.GetChild.<span class="f">Find</span>(<span class="s">"ali"</span>).Show
+<span class="v">REF</span>.GetChild.<span class="f">Find</span>(<span class="s">"ali"</span>).Disable
+<span class="v">REF</span>.GetChild.<span class="f">Find</span>(<span class="s">"ali"</span>).Enable
+
+<span class="k">if</span> (<span class="v">self</span>.Raycast.IsColliding) {
+    <span class="f">printf</span>(<span class="s">"Body: %s\n"</span>, <span class="v">self</span>.Raycast.GetBodyName);
+}</code></pre>
+</section>
+
+<!-- ================= NODE TÜRLERI ================= -->
+<section id="node-turleri">
+  <h2>Node Türleri</h2>
+
+  <h3>3D</h3>
+  <div class="ln"><div class="name"><code>@extern Scene</code></div><div class="desc">sahne kökü (Spatial)</div></div>
+  <div class="ln"><div class="name"><code>@extern Body</code></div><div class="desc">KinematicBody — hareketli karakter</div></div>
+  <div class="ln"><div class="name"><code>@extern RigidBody</code></div><div class="desc">fizik motorlu cisim</div></div>
+  <div class="ln"><div class="name"><code>@extern StaticBody</code></div><div class="desc">sabit cisim (zemin, duvar)</div></div>
+  <div class="ln"><div class="name"><code>@extern Area</code></div><div class="desc">trigger bölgesi</div></div>
+  <div class="ln"><div class="name"><code>@extern Light</code></div><div class="desc">ışık (Directional / Omni / Spot)</div></div>
+  <div class="ln"><div class="name"><code>@extern Camera</code></div><div class="desc">Camera3D</div></div>
+  <div class="ln"><div class="name"><code>@extern Particles</code></div><div class="desc">parçacık efekti</div></div>
+  <div class="ln"><div class="name"><code>@extern Audio</code></div><div class="desc">3D ses kaynağı</div></div>
+  <div class="ln"><div class="name"><code>@extern Sprite3D</code></div><div class="desc">kameraya dönük resim</div></div>
+  <div class="ln"><div class="name"><code>@extern Label3D</code></div><div class="desc">3D yazı</div></div>
+  <div class="ln"><div class="name"><code>@extern Animation</code></div><div class="desc">animasyon oynatıcı</div></div>
+  <div class="ln"><div class="name"><code>@extern Navigation</code></div><div class="desc">yol bulma (AI)</div></div>
+  <div class="ln"><div class="name"><code>@extern GridMap</code></div><div class="desc">grid tabanlı harita</div></div>
+  <div class="ln"><div class="name"><code>@extern CSG</code></div><div class="desc">basit şekillerden bina</div></div>
+  <div class="ln"><div class="name"><code>@extern Joint</code></div><div class="desc">menteşe / bağ</div></div>
+  <div class="ln"><div class="name"><code>@extern Collision</code></div><div class="desc">çarpışma şekli</div></div>
+  <div class="ln"><div class="name"><code>@extern WorldEnv</code></div><div class="desc">ortam (sis, gama, renk)</div></div>
+  <div class="ln"><div class="name"><code>@extern MultiMesh</code></div><div class="desc">binlerce aynı mesh</div></div>
+  <div class="ln"><div class="name"><code>@extern RemoteTransform</code></div><div class="desc">başka node'u takip et</div></div>
+</section>
+
+<!-- ================= MATERIAL ================= -->
+<section id="material">
+  <h2>Material</h2>
+
+  <h3>Renk ve Doku</h3>
+  <div class="ln"><div class="name"><code>REF.Material.Color</code></div><div class="desc">rgb renk</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Albedo</code></div><div class="desc">doku — <code>preload("...")</code> veya <code>load("...")</code></div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Metallic</code></div><div class="desc">0..1 metalik</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Metallic.Specular</code></div><div class="desc">0..1 metalik bileşen</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Metallic.Texture</code></div><div class="desc">metalik dokusu</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Roughness</code></div><div class="desc">0..1 pürüzlülük</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Roughness.Texture</code></div><div class="desc">pürüzlülük dokusu</div></div>
+
+  <h3>Parıltı</h3>
+  <div class="ln"><div class="name"><code>REF.Material.Emission</code></div><div class="desc">0..1 parlama gücü</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.EmissionColor</code></div><div class="desc">ışık rengi</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.EmissionTexture</code></div><div class="desc">parlama dokusu</div></div>
+
+  <h3>Normal ve Gölge</h3>
+  <div class="ln"><div class="name"><code>REF.Material.NormalMap.Enable</code></div><div class="desc">true / false</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.NormalMap.Scale</code></div><div class="desc">0..1 girinti gücü</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.NormalMap.Texture</code></div><div class="desc">normal dokusu</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.AO</code></div><div class="desc">0..1 ambient occlusion</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.AO.Texture</code></div><div class="desc">ao dokusu</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.CastShadows</code></div><div class="desc">gölge düşürsün mü</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.DoubleSided</code></div><div class="desc">iki yüzlülük</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.CullBackface</code></div><div class="desc">arka yüzü at</div></div>
+
+  <h3>Saydamlık ve Karışım</h3>
+  <div class="ln"><div class="name"><code>REF.Material.Opacity</code></div><div class="desc">0..1 saydamlık</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Transparent</code></div><div class="desc">alfa karışımı aç</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.BlendMode</code></div><div class="desc">mix / add / sub / mul</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.ShadingMode</code></div><div class="desc">unshaded / per-pixel</div></div>
+
+  <h3>UV ve Detay</h3>
+  <div class="ln"><div class="name"><code>REF.Material.UV1Offset</code></div><div class="desc">doku kaydırma (x,y)</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.UV1Scale</code></div><div class="desc">doku ölçeği (x,y)</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Detail.Albedo</code></div><div class="desc">detay albedo dokusu</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Detail.Roughness</code></div><div class="desc">detay pürüzlülük</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Detail.Normal</code></div><div class="desc">detay normal</div></div>
+
+  <h3>Metotlar</h3>
+  <div class="ln"><div class="name"><code>REF.Material.Clear()</code></div><div class="desc">varsayılan ayarlara dön</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Copy(REF.Material)</code></div><div class="desc">başka materialdan kopyala</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Save("res://...")</code></div><div class="desc">dosyaya kaydet</div></div>
+  <div class="ln"><div class="name"><code>REF.Material.Load("res://...")</code></div><div class="desc">dosyadan yükle</div></div>
+</section>
+
+<!-- ================= HAZIR ================= -->
+<section id="hazir">
+  <h2>Hazır Fonksiyonlar</h2>
+
+  <h3>Yaşam Döngüsü</h3>
+  <div class="ln"><div class="name"><code>void Ready()</code></div><div class="desc">sahne başladığında 1 kez</div></div>
+  <div class="ln"><div class="name"><code>void Update(float delta)</code></div><div class="desc">her kare</div></div>
+  <div class="ln"><div class="name"><code>void UpdatePhysics(float delta)</code></div><div class="desc">her fizik karesi</div></div>
+
+  <h3>Engine</h3>
+  <div class="ln"><div class="name"><code>Engine.GetFPS</code></div><div class="desc">FPS değeri</div></div>
+  <div class="ln"><div class="name"><code>Engine.SetFPS</code></div><div class="desc">FPS sınırı</div></div>
+  <div class="ln"><div class="name"><code>Engine.GetScreenSize</code></div><div class="desc">ekran boyutu</div></div>
+  <div class="ln"><div class="name"><code>Engine.GetWindowSize</code></div><div class="desc">pencere boyutu</div></div>
+
+  <h3>Input</h3>
+  <div class="ln"><div class="name"><code>Input.IsPressed("e")</code></div><div class="desc">basılı tutuluyor mu</div></div>
+  <div class="ln"><div class="name"><code>Input.IsUp("e")</code></div><div class="desc">yeni bırakıldı mı</div></div>
+  <div class="ln"><div class="name"><code>Input.IsDown("e")</code></div><div class="desc">yeni basıldı mı</div></div>
+
+  <h3>Tam Yol Node Erişimi</h3>
+<pre><code>$<span class="s">"FPSController/head/Camera/RayCast"</span>   <span class="c"># full path node</span>
+$<span class="s">""</span>.members</code></pre>
+</section>
+
+</main>
+
+<footer>
+  GnuChan Engine — <b>GCL</b> Purple Documentation · LICENSE: Zlib
+</footer>
+
+</body>
+</html>

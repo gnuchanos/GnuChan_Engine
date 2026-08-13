@@ -1,0 +1,220 @@
+#| blok yorum testi:
+   bu satirlar calismamali
+|#
+
+#define MAX_PLAYER 10
+#ifndef NOPE
+int nope_var = 1;
+#endif
+#ifdef MAX_PLAYER
+int max_ok = 1;
+#endif
+#if windows
+int win_ok = 1;
+#endif
+#warning "hasar", "deger", MAX_PLAYER
+public int pub = 5;
+const int cst = 7;
+
+@extern Spatial
+
+int   EDSF = 31
+float ABCD = 30.30000;
+
+int8    number0 = 10;
+int16   number1 = 100;
+int32   number2 = 1000;
+int64   number3 = 10000;
+int128  number4 = 100000;
+short   number5 = 10;
+int     number6 = 10000;
+long    number7 = 100000;
+long long number8 = 1000000;
+
+long long int v1 = 1000000;
+unsigned long int v2 = 2000000;
+
+uint8   unumber1 = 10;
+uint16  unumber2 = 100;
+uint32  unumber3 = 1000;
+uint64  unumber4 = 10000;
+uint128 unumber5 = 100000;
+unsigned short unumber6 = 10;
+unsigned int   unumber7 = 100;
+unsigned long  unumber8 = 1000;
+unsigned long long unumber9 = 10000;
+
+float32 fnumber1 = 10.30;
+float64 fnumber2 = 10.3000;
+float128 fnumber3 = 10.30000;
+float   fnumber4 = 10.30;
+double  fnumber5 = 10.3000;
+long double fnumber6 = 10.30000;
+
+char TEXT   = 'a';
+gcChar TEXT2[] = "stack string";
+char *text = null;
+char alphabet[] = {'a', 'b', 'c'};
+char game[] = "Half Life 3";
+char ***games = null;
+gcChar gamesgames[] @1 = {'g', 'n'};
+
+typedef int32_t myint;
+typedef struct Player {
+    char name[32];
+    int health;
+    float speed;
+} Player2;
+
+enum Color {
+    RED,
+    GREEN,
+    BLUE
+};
+
+struct Vec2 {
+    float x;
+    float y;
+};
+
+tuple mix = ('a', "half life 3", 10, 300.2000, 33);
+dict player = {
+    gcChar name : "gnuchanos",
+    int8 scale: 30
+};
+Player2 p1 = { .name = "bob", .health = 100, .speed = 20 };
+Vec2 a = { .x = 3, .y = 4 };
+myint mx = 42;
+
+int counter = 0;
+int sum = 0;
+enum Mood { HAPPY, SAD, ANGRY };
+
+int add(int a, int b) {
+	return a + b;
+}
+
+class FATHER() {
+	@return
+	int Age() {
+		return 55;
+	}
+}
+
+class CHILD(FATHER) {
+	void head(gcChar who) {
+		gcChar name = who;
+	}
+	void talk() {
+		print("child talks!\n");
+	}
+}
+
+void Ready() {
+	PrintF("EDSF %d\n", EDSF);
+	PrintF("ABCD %f\n", ABCD);
+	PrintF("TEXT %c\n", TEXT);
+	PrintF("TEXT2 %s\n", TEXT2);
+	PrintF("game %s\n", game);
+	PrintF("alphabet %s\n", alphabet);
+	PrintF("RED %d GREEN %d BLUE %d\n", RED, GREEN, BLUE);
+	PrintF("p1.name %s p1.health %d p1.speed %f\n", p1.name, p1.health, p1.speed);
+	PrintF("a.x %f a.y %f\n", a.x, a.y);
+	PrintF("mx %d\n", mx);
+	PrintF("mix[1] %s mix[3] %f\n", mix[1], mix[3]);
+	PrintF("player.name %s player.scale %d\n", player.name, player.scale);
+
+	PrintF("int8:        %d\n", number0);
+	PrintF("uint8:             %u\n", unumber1);
+	PrintF("float32:       %f\n", fnumber1);
+
+	# kontrol akisi
+	if (EDSF == 31) {
+		PrintF("if: EDSF == 31 OK\n");
+	} else {
+		PrintF("if: EDSF != 31 BAD\n");
+	}
+
+	if (EDSF > 50) {
+		PrintF("if/else-if: > 50\n");
+	} else if (EDSF > 20) {
+		PrintF("if/else-if: > 20 (EDSF)\n");
+	} elif (EDSF > 10) {
+		PrintF("elif calisti\n");
+	} else {
+		PrintF("else calisti\n");
+	}
+
+	for (int i = 0; i < 3; i++) {
+		sum += i;
+	}
+	PrintF("for: sum = %d\n", sum);
+
+	while (counter < 3) {
+		counter++;
+	}
+	PrintF("while: counter = %d\n", counter);
+
+	int m = HAPPY;
+	switch (m) {
+		case HAPPY:
+			PrintF("switch: HAPPY\n");
+			break;
+		case SAD:
+			PrintF("switch: SAD\n");
+			break;
+		default:
+			PrintF("switch: default\n");
+			break;
+	}
+
+	# kullanici fonksiyonu
+	int r = add(19, 23);
+	PrintF("func: add(19, 23) = %d\n", r);
+
+	# class
+	FATHER ThisFather = FATHER;
+	CHILD  ThisChild  = CHILD("ali");
+
+	PrintF("class: ThisFather.Age = %d\n", ThisFather.Age);
+	ThisChild.talk();
+
+	# ternary / bitwise / sizeof / operator typedef
+	int pick = (EDSF > 20) ? 100 : 0;
+	PrintF("ternary: pick = %d\n", pick);
+
+	int band = 5 & 3;
+	int bor  = 5 | 3;
+	int bxor = 5 ^ 3;
+	int bsh  = 1 << 4;
+	PrintF("bitwise: 5&3=%d 5|3=%d 5^3=%d 1<<4=%d\n", band, bor, bxor, bsh);
+
+	PrintF("sizeof: int=%d double=%d char=%d\n", sizeof(int), sizeof(double), sizeof(char));
+
+	if (5 & 1) {
+		PrintF("bitwise cond: 5 & 1 = true\n");
+	} else {
+		PrintF("bitwise cond: 5 & 1 = false\n");
+	}
+
+	typedef == equals;
+	typedef != notEquals;
+	typedef && and;
+	typedef || or;
+	typedef ! not;
+
+	if (10 equals 10 and 1 or 0) {
+		PrintF("op-typedef: equals/and/or OK\n");
+	}
+	if (not (1 equals 2)) {
+		PrintF("op-typedef: not OK\n");
+	}
+}
+
+void Update(float delta) {
+	
+}
+
+void UpdatePhysics(float delta) {
+	
+}

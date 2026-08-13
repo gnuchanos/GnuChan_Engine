@@ -1,0 +1,10 @@
+config_version=4
+
+[application]
+
+config/name="GCLTest"
+run/main_scene="res://nonexistent.tscn"
+
+[autoload]
+
+GCLMain="res://main.gcsf"

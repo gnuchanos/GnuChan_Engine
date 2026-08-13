@@ -129,7 +129,11 @@ void EditorLog::add_message(const String &p_msg, MessageType p_type) {
 	}
 
 	log->add_text(p_msg);
-	log->add_newline();
+	/* Mesaj kendi satir sonuyla bitiyorsa (C printf gibi) bir daha ekleme;
+	   aksi halde cift satir / son bos satir gorunur. */
+	if (!p_msg.ends_with("\n")) {
+		log->add_newline();
+	}
 
 	if (restore) {
 		log->pop();
