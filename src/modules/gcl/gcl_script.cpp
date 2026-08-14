@@ -15,6 +15,7 @@
 #include "core/class_db.h"
 #include "core/engine.h"
 #include "core/object.h"
+#include "core/os/os.h"
 #include "Executor/executor.h"
 #include "Lexer/lexer.h"
 #include "Parser/parser.h"
@@ -127,11 +128,25 @@ void GCLScriptInstance::notification(int p_notification) {
 		Variant::CallError err;
 		call("Ready", nullptr, 0, err);
 	} else if (p_notification == Node::NOTIFICATION_PROCESS) {
+		/* Gercek kare suresini (delta) gec: 'Body.Rotation.y += 100 * delta'
+		   icinde delta 0 kalmasin. */
 		Variant::CallError err;
-		call("Update", nullptr, 0, err);
+		Variant delta = 1.0 / 60.0;
+		Node *node = Object::cast_to<Node>(owner);
+		if (node) {
+			delta = node->get_process_delta_time();
+		}
+		const Variant *args[1] = { &delta };
+		call("Update", args, 1, err);
 	} else if (p_notification == Node::NOTIFICATION_PHYSICS_PROCESS) {
 		Variant::CallError err;
-		call("UpdatePhysics", nullptr, 0, err);
+		Variant delta = 1.0 / 60.0;
+		Node *node = Object::cast_to<Node>(owner);
+		if (node) {
+			delta = node->get_physics_process_delta_time();
+		}
+		const Variant *args[1] = { &delta };
+		call("UpdatePhysics", args, 1, err);
 	}
 }
 
@@ -152,9 +167,49 @@ Variant GCLScriptInstance::call(const StringName &p_method, const Variant **p_ar
 		   icinde OBJECT uzerinden cozulur. */
 		members[StringName("self")] = owner ? Variant((Object *)owner) : Variant();
 
+		/* Parametre baglama: Update/UpdatePhysics birinci argumani (delta)
+		   members'a yaz ki 'Body.Rotation.y += 100 * delta' gercek delta
+		   ile toplasin. Kucuk harf VARSAYIM: GCL imzasi 'float delta' */
+		if (p_method == "Update" || p_method == "UpdatePhysics") {
+			if (p_args && p_argcount >= 1 && p_args[0]) {
+				members[StringName("delta")] = *p_args[0];
+			}
+		}
+
 		if (p_method == "Ready") {
 			String global_code = executor_strip_bodies(code);
 			executor_run(global_code, members, types);
+		}
+
+		/* Time.Sleep non-blocking devam. Sleep YALNIZCA icinde oldugu
+		   FONKSIYONUN kalan satirlarini erteletir; Update/UpdatePhysics
+		   govdesi beklerken HER FRAME CALISMAYA DEVAM EDER (raycast/
+		   donme/spawn gibi isler donmaz). Sure dolunca sleep_rest
+		   kopyalanan scope ile bir kez calistirilir. */
+		if (types.sleep_pending && !types.sleep_rest.empty()) {
+			double now = (double)OS::get_singleton()->get_ticks_msec();
+			if (now >= types.sleep_until) {
+				/* Kalan satirlari saklanmis scope'la calistir. */
+				Map<StringName, Variant> resume_scope;
+				for (const Map<StringName, Variant>::Element *E = types.sleep_scope.front(); E; E = E->next()) {
+					resume_scope[E->key()] = E->get();
+				}
+				String rest = types.sleep_rest;
+				types.sleep_rest = String();
+				types.sleep_pending = false;
+				types.sleep_armed = false;
+				types.sleep_rest_captured = false;
+				executor_run(rest, resume_scope, types);
+				/* yerel degisken/parametre degisikliklerini members'a geri yaz */
+				for (const Map<StringName, Variant>::Element *E = resume_scope.front(); E; E = E->next()) {
+					members[E->key()] = E->get();
+				}
+			}
+		} else if (types.sleep_pending) {
+			/* korunma: rest bos ise bekleme durumunu temizle. */
+			types.sleep_pending = false;
+			types.sleep_armed = false;
+			types.sleep_rest_captured = false;
 		}
 
 		/* Cagrilan fonksiyonun govdesi bulunur ve yorumlanir. */

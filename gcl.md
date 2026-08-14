@@ -1,14 +1,16 @@
 # gcl_language..md icinde temel dil tasarimi var fakat gcl.md icinde motor odakli kisim var
 
-her @extern Node girisi python class gibi class icinde self. ile erisilebilir degerler vardir
+# otomatik tamamlama
 
-ornek @extern FPSController
+1: gcl dil tasarimi
+2: olusturulan degerler
+3: self. ile tree
+    self. -> @extern.member, @extern.@extern.member # ornek tree sadece
 
-self. dediginde fpsconrollerin icindeki temel degerlere erisirsin
-self.Raycast fpscontrollerin referans gosterdigi diger class node sahnede hazr duruyor
-self.Camera da ayni mantik
 
-self.Raycast.GetNode ile cagrilan nodelarin kendi ozellikleri olabilir ornek child icinde mesh, collision ... classlari olabilir ozetle @extern python class gibi calisiyor
+
+
+
 
 #// Hazir fonksiyonlar
 void Ready() {

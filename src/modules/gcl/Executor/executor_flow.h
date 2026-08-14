@@ -247,6 +247,31 @@ inline void apply_assignment(const String &p_line, Map<StringName, Variant> &p_m
 				}
 				return;
 			}
+			/* Obje member bilesik: "Body.Rotation.y += 100 * delta" */
+			if (base.find(".") != -1) {
+				double cur = executor_core::variant_real(executor_core::evaluate_expr(base, p_members));
+				double val = executor_core::variant_real(solve_arith(rhs, p_members));
+				double result = 0.0;
+				switch (opc) {
+					case '+':
+						result = cur + val;
+						break;
+					case '-':
+						result = cur - val;
+						break;
+					case '*':
+						result = cur * val;
+						break;
+					case '/':
+						result = val == 0.0 ? cur : cur / val;
+						break;
+					case '%':
+						result = val == 0.0 ? cur : (double)((int64_t)cur % (int64_t)val);
+						break;
+				}
+				executor_core::set_member_value(base, result, p_members);
+				return;
+			}
 		}
 	}
 

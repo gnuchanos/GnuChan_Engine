@@ -548,34 +548,6 @@ void function(..., ...);
 type function(..., ...);
 ```
 
-
-## Otomatik Tamamlama (Auto Completion)
-
-### Dil Anahtar Kelimeleri (nokta olmadan da calisir)
-
-Bos satirda veya kelime yazarken de tamamlama cikar:
-
-`
-if, elif, else, switch, case, default
-break, continue, return, for, while, do
-int, short, float, double, long, unsigned, char, bool
-void, const, sizeof, struct, enum, typedef, union, static
-int8, int16, int32, int64, int128
-uint8, uint16, uint32, uint64, uint128
-float16, float32, float64, float128
-gcChar, gcMalloc, public, private, global, inline, tuple, dict
-PrintF, malloc, free
-#include, #lib, #extern, #register
-#define, #undef, #warning, #error, #debug
-#ifdef, #ifndef, #if, #elif, #else, #endif
-`
-
-Ornek: in yazinca -> int / int8 / int16 / int128 / inline
-Ornek: sw yazinca -> switch onerilir
-Ornek: gc yazinca -> gcChar / gcMalloc onerilir
-Ornek: if yazinca -> if onerilir
-# gerisine gerek yok suanda
-
 ## class
 
 ### 101

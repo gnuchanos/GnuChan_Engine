@@ -35,8 +35,26 @@ struct GCLTypeRegistry {
 	Map<StringName, Dictionary> classes; /* "FATHER" -> class sablonu (base/src/head) */
 	int call_depth;                     /* kullanici fonksiyon cagri derinligi (recursion guard) */
 
+	/* Time.Sleep non-blocking: motor axarken bu script'in devamini erteletir.
+	   Sleep YALNIZCA cagrildigi fonksiyonun kalan satirlarini erteler;
+	   Update/UpdatePhysics govdesi beklerken her frame calismaya devam eder.
+	   sleep_armed: Sleep satiri bir kez kuruldu (aynı satir her frame yeniden
+	   tetiklendigi surece sleep_until kaydirilmasin). sleep_rest_captured:
+	   kalan satirlar + scope ilk tetiklemede bir kez kopyalandi. Sure dolunca
+	   gcl_script.cpp sleep_rest'i sleep_scope ile bir kez calistirir. */
+	bool sleep_pending;
+	bool sleep_armed;
+	bool sleep_rest_captured;
+	double sleep_until;
+	String sleep_rest;
+	Map<StringName, Variant> sleep_scope;
+
 	GCLTypeRegistry() :
-			call_depth(0) {
+			call_depth(0),
+			sleep_pending(false),
+			sleep_armed(false),
+			sleep_rest_captured(false),
+			sleep_until(0.0) {
 	}
 };
 

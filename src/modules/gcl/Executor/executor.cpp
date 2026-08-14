@@ -226,7 +226,11 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 
 			/* -------------------- atama -------------------- */
 			int eq = stmt.find("=");
-			if (eq > 0) {
+			/* "+=" gibi bilesik atamalar yukarida apply_assignment ile islendi;
+			   tekrar buraya duserse lhs "x +" olur ve obj member dalina (lhs ".")
+			   takilip absolute yazim yapar. O yuzden burada atla. */
+			if (eq > 0 && stmt[eq - 1] != '+' && stmt[eq - 1] != '-' &&
+					stmt[eq - 1] != '*' && stmt[eq - 1] != '/' && stmt[eq - 1] != '%') {
 				String lhs = stmt.substr(0, eq).strip_edges();
 				String rhs = stmt.substr(eq + 1).strip_edges();
 				if (rhs.ends_with(";")) {
@@ -248,7 +252,7 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 					bool known_type = is_number_keyword(type) || p_types.types.has(StringName(type)) ||
 							p_types.aliases.has(StringName(type)) || p_types.classes.has(StringName(type)) ||
 							type == "tuple" || type == "dict" || type == "struct" || type == "enum" || type == "union" ||
-							type == "NODE" || type == "REF" || type == "ABC" ||
+							type == "NODE" || type == "REF" || type == "ABC" || type == "Node" || type == "NodeRef" ||
 							type.begins_with("struct ") || type.begins_with("enum ") || type.begins_with("union ");
 
 					if (known_type) {
@@ -328,16 +332,40 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 					} else {
 						p_members[StringName(lhs.strip_edges())] = solve_arith(rhs, p_members);
 					}
+				} else if (lhs.find(".") != -1) {
+					/* Obje member atamasi: "Body.Rotation.y = 5" veya
+					   "NODE REF = ..." sonrasi "REF.Position.x = ..." */
+					Variant rvalue = solve_arith(rhs, p_members);
+					set_member_value(lhs, rvalue, p_members);
 				}
 			}
 
 			/* --- cikti / class / fonksiyon cagrilari --- */
-			/* self.<zincir>.<Metot>(args): "self.Raycast.Skip(self)" gibi
-			   extern metod cagrilarini once dene. resolve_user_call yalnizca
-			   duz "isim(args)" kalibini cozer; noktali zincirler daha once
-			   sessizce yutuluyordu - bu yuzden karakter kendi capsule'ine
-			   takilip "Body Name: FPSController" spam'i basiyordu. */
-			if (!handle_extern_call(stmt, p_members)) {
+			/* "Time.Sleep(0.5)" gibi statik Time tablosu once dene. */
+			if (handle_time_call(stmt, p_members, p_types)) {
+				/* Sleep LOCAL'tir: kalan satirlar + scope yalnizca ILK
+				   tetiklemede bir kez saklanir. Daha sonra ayni Sleep
+				   satirina yeniden gelinirse (her frame Update ayni
+				   fonksiyonu cagirir) sure kaydirilmaz VE bu fonksiyonun
+				   kalan satirlari YINE calistirilmaz; sure dolunca
+				   sleep_rest bir kez calistirilir. Ust fonksiyon (Update)
+				   bu fonksiyondan sonra normal sekilde devam eder. */
+				if (!p_types.sleep_rest_captured) {
+					p_types.sleep_rest_captured = true;
+					p_types.sleep_rest = p_body.substr(line_end + 1);
+					p_types.sleep_scope.clear();
+					for (const Map<StringName, Variant>::Element *E = p_members.front(); E; E = E->next()) {
+						p_types.sleep_scope[E->key()] = E->get();
+					}
+				}
+				line_start = len + 1;
+				break;
+			} else if (!handle_extern_call(stmt, p_members)) {
+				/* self.<zincir>.<Metot>(args): "self.Raycast.Skip(self)" gibi
+				   extern metod cagrilarini once dene. resolve_user_call yalnizca
+				   duz "isim(args)" kalibini cozer; noktali zincirler daha once
+				   sessizce yutuluyordu - bu yuzden karakter kendi capsule'ine
+				   takilip "Body Name: FPSController" spam'i basiyordu. */
 				if (!handle_call_full(stmt, p_members, p_types)) {
 					if (!resolve_class_call(stmt, p_members, p_types, nullptr)) {
 						resolve_user_call(stmt, p_members, p_types, nullptr);

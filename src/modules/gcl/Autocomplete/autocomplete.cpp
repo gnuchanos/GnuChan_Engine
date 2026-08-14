@@ -37,6 +37,7 @@ static const char *const known_keywords[] = {
 	"uint8", "uint16", "uint32", "uint64", "uint128",
 	"float16", "float32", "float64", "float128",
 	"gcChar", "gcMalloc", "public", "private", "global", "inline", "tuple", "dict",
+	"Node", "NodeRef",
 	"self",
 	"scanf", "malloc", "free",
 	"#include", "#lib", "#extern", "#register",
@@ -90,6 +91,10 @@ static const char *const camera_members[] = {
 	"HeadBobAmount",
 	"RunFovChange",
 	"GetNode",
+};
+
+static const char *const time_members[] = {
+	"Sleep(seconds)",
 };
 
 static const char *const node_members[] = {
@@ -376,19 +381,26 @@ Error autocomplete_run(const String &p_code, Object *p_owner, List<ScriptCodeCom
 		return OK;
 	}
 
+	/* Time. sonrasi. */
+	if (left.ends_with("Time.") || left.ends_with("Time.S")) {
+		for (int i = 0; i < (int)(sizeof(time_members) / sizeof(time_members[0])); i++) {
+			r_options->push_back(ScriptCodeCompletionOption(time_members[i], ScriptCodeCompletionOption::KIND_FUNCTION));
+		}
+		return OK;
+	}
+
 	/* Normal yazim: imlec solundaki SON KELIME (sembolsuz, + on-ek filtreli). */
 	String match = get_last_word(left);
 
-	/* "<degisken>." -> NODE/REF tipi degisken uyeleri (on-ek filtreli).
-	   Obje adi bos olamaz; yalnizca imlec SOLUNDAKI zinciri ele alinir.
-	   Ornek: 'ref.x' -> obj='ref', member='x' (Name, Position... x ile) */
+	/* "<degisken>.<uye-on-ek>" -> NODE/REF tipi degisken uyeleri.
+	   'Body.'  -> tum uyeler (member bos)
+	   'Body.Ro -> Rotation (on-ek filtreli)
+	   'ref.x'  -> x ile baslayanlar
+	   Obje adi bos olamaz; yalnizca imlec SOLUNDAKI zincir ele alinir. */
 	{
 		int last_dot = left.rfind(".");
-		if (last_dot != -1 && last_dot == left.length() - 1) {
-			String before = left.substr(0, last_dot);
-			while (!before.empty() && before[before.length() - 1] == ' ') {
-				before = before.substr(0, before.length() - 1);
-			}
+		if (last_dot != -1) {
+			String before = left.substr(0, last_dot).strip_edges();
 			String obj = get_last_word(before);
 			if (!obj.empty() && obj != "self") {
 				String member = get_last_word(left);

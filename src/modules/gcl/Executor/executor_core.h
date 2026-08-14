@@ -15,6 +15,7 @@
 #include "core/object.h"
 #include "core/os/input.h"
 #include "core/os/keyboard.h"
+#include "core/os/os.h"
 #include "core/print_string.h"
 #include "scene/3d/fps_controller.h"
 #include "scene/3d/ray_cast.h"
@@ -125,7 +126,10 @@ inline Variant resolve_object_member(Object *p_obj, const String &p_field) {
 			Object *col = rc->get_collider();
 			out = col ? col->get("name") : Variant();
 		} else if (p_field == "GetNode") {
-			out = Variant((Object *)rc);
+			/* CARPILAN CISMI dondur; RayCast'in kendisini DEGIL.
+			   (FPSController dalindaki GetNode ile tutarli.) */
+			Object *col = rc->get_collider();
+			out = col ? Variant(col) : Variant();
 		} else if (p_field == "length") {
 			out = rc->get_cast_to().length();
 		} else if (p_field == "Free") {
@@ -141,8 +145,16 @@ inline Variant resolve_object_member(Object *p_obj, const String &p_field) {
 		return out;
 	}
 
-	/* Genel Object: property; yoksa child node (harf duyarsiz); o da yoksa method. */
+	/* Genel Object: property (harf duyarsiz); yoksa child node (harf duyarsiz);
+	   o da yoksa method. "self.Rotation" GCL imlasi Godot'ta "rotation"
+	   property'sine karsi gelir; buyuk harf ayrimi yapilmaz. */
 	Variant member = p_obj->get(StringName(p_field));
+	if (member.get_type() == Variant::NIL) {
+		String low_field = p_field.to_lower();
+		if (low_field != p_field) {
+			member = p_obj->get(StringName(low_field));
+		}
+	}
 	if (member.get_type() == Variant::NIL) {
 		Node *node = Object::cast_to<Node>(p_obj);
 		if (node) {
@@ -171,6 +183,119 @@ inline Variant resolve_object_member(Object *p_obj, const String &p_field) {
 		out = member;
 	}
 	return out;
+}
+
+/* Bir Variant degeri uzerinde uye cozer. Dictionary/Object'in disinda
+   scalar/vektor renk gibi primitif uyeler:
+   - Vector3: x/y/z;  Vector2: x/y;  Color: r/g/b/a;  Quat: x/y/z/w
+   - String  : "name".Name -> kendisi (GetBodyName sonucu "BodyName.Name"
+     ile de okunabilsin diye; GCL kolayligi). */
+inline Variant resolve_member_value(const Variant &p_val, const String &p_field) {
+	if (p_val.get_type() == Variant::DICTIONARY) {
+		Dictionary d = p_val;
+		if (d.has(p_field)) {
+			return d[p_field];
+		}
+		return Variant();
+	}
+	if (p_val.get_type() == Variant::OBJECT) {
+		return resolve_object_member((Object *)p_val, p_field);
+	}
+	if (p_val.get_type() == Variant::STRING) {
+		if (p_field == "Name" || p_field == "name") {
+			return p_val;
+		}
+		return Variant();
+	}
+	if (p_val.get_type() == Variant::VECTOR3) {
+		Vector3 v = p_val;
+		if (p_field == "x") return v.x;
+		if (p_field == "y") return v.y;
+		if (p_field == "z") return v.z;
+		return Variant();
+	}
+	if (p_val.get_type() == Variant::VECTOR2) {
+		Vector2 v = p_val;
+		if (p_field == "x") return v.x;
+		if (p_field == "y") return v.y;
+		return Variant();
+	}
+	if (p_val.get_type() == Variant::COLOR) {
+		Color c = p_val;
+		if (p_field == "r") return c.r;
+		if (p_field == "g") return c.g;
+		if (p_field == "b") return c.b;
+		if (p_field == "a") return c.a;
+		return Variant();
+	}
+	if (p_val.get_type() == Variant::QUAT) {
+		Quat q = p_val;
+		if (p_field == "x") return q.x;
+		if (p_field == "y") return q.y;
+		if (p_field == "z") return q.z;
+		if (p_field == "w") return q.w;
+		return Variant();
+	}
+	return Variant();
+}
+
+/* Property'yi harf duyarsiz set eder: "Body.Rotation" -> "rotation".
+   Godot 3 Object::set(void) + bool* valid imzalariyla calisir. */
+inline void set_object_property(Object *p_obj, const String &p_name, const Variant &p_val) {
+	bool valid = false;
+	p_obj->set(StringName(p_name), p_val, &valid);
+	if (!valid) {
+		String low = p_name.to_lower();
+		if (low != p_name) {
+			p_obj->set(StringName(low), p_val, &valid);
+		}
+	}
+}
+
+/* "A.B.y" zincir degerini yazar. Iki uzunlukta desteklenir:
+   - "Obj.Property"      : nesne property'si (harf duyarsiz)
+   - "Obj.Property.axis" : primitif member (Vector3.y, Color.r ...)
+   Dictionary zincirleri icin erisim read-only'dir (degisiklik yazilmaz),
+   cunku Dictionary kopyasi uzerinden yazmak orijinali degistirmez. */
+inline void set_member_value(const String &p_lhs, const Variant &p_val, const Map<StringName, Variant> &p_members) {
+	String s = p_lhs.strip_edges();
+	Vector<String> parts = split_top_level(s, '.');
+	if (parts.size() < 2 || parts.size() > 3) {
+		return;
+	}
+	String root = parts[0].strip_edges();
+	if (!p_members.has(StringName(root))) {
+		return;
+	}
+	Variant root_val = p_members[StringName(root)];
+	if (root_val.get_type() != Variant::OBJECT) {
+		return;
+	}
+	Object *obj = root_val.operator Object *();
+
+	if (parts.size() == 2) {
+		set_object_property(obj, parts[1].strip_edges(), p_val);
+		return;
+	}
+	/* "Obj.Property.axis": degistirilecek property'yi oku, primitif memberini
+	   set et, geri yaz. */
+	Variant prop = resolve_object_member(obj, parts[1].strip_edges());
+	String axis = parts[2].strip_edges();
+	Vector3 v3 = prop;
+	switch (axis[0]) {
+		case 'x':
+			v3.x = variant_real(p_val);
+			break;
+		case 'y':
+			v3.y = variant_real(p_val);
+			break;
+		case 'z':
+			v3.z = variant_real(p_val);
+			break;
+		default:
+			return;
+	}
+	set_object_property(obj, parts[1].strip_edges(), Variant(v3));
 }
 
 /* "A.B[0].C" zincir ifadesini degerlendirir. */
@@ -218,7 +343,8 @@ inline Variant evaluate_expr(const String &p_expr, const Map<StringName, Variant
 			} else if (cur.get_type() == Variant::OBJECT) {
 				cur = resolve_object_member((Object *)cur, field);
 			} else {
-				return Variant();
+				/* primitif uyeler: Vector3.x/y/z, Color.r/g/b/a, String.Name... */
+				cur = resolve_member_value(cur, field);
 			}
 			i = j;
 		} else if (expr[i] == '[') {
@@ -746,6 +872,89 @@ inline void handle_typedef_stmt(const String &p_stmt, Map<StringName, Variant> &
 			p_types.aliases[StringName(alias)] = orig;
 		}
 	}
+}
+
+/* "Time.Sleep(0.5)" gibi Time namespace cagrilarini isler.
+   Time bir Godot nesnesi DEGILDIR; GCL statik tablosudur.
+   Sleep NON-BLOCKING'tir: OS::delay_usec kullanilmaz (tum motoru
+   dondururdu). Bunun yerine su anki scriptin devamini sleep_rest ile
+   erteler; gcl_script.cpp sonraki frame'lerde sure dolunca devami calistirir.
+   LOCAL'tir: yalnizca Sleep'in icinde oldugu FONKSIYONUN kalan satirlari
+   ertelenir; ayni satir her frame yeniden tetiklendigi surece (sure dolana
+   kadar) sleep_until kaydirilmaz ve kalan satirlar bir kez kopyalanir.
+   Donus: true = Sleep YENiDEN kuruldu (sure basladi), false = zaten
+   bekliyor (sure kaydirilmadi). */
+inline bool handle_time_call(const String &p_line, const Map<StringName, Variant> &p_members, GCLTypeRegistry &p_types) {
+	String s = p_line.strip_edges().replace(";", "").strip_edges();
+	if (!s.begins_with("Time.") || s.find("(") == -1) {
+		return false;
+	}
+
+	/* "Time.Sleep(...)" -> seg = "Sleep" */
+	int pos = 5;
+	int seg_start = pos;
+	while (pos < s.length() && is_ident_char(s[pos])) {
+		pos++;
+	}
+	if (pos == seg_start) {
+		return false;
+	}
+	String seg = s.substr(seg_start, pos - seg_start);
+	int after = pos;
+	while (after < s.length() && (s[after] == ' ' || s[after] == '\t')) {
+		after++;
+	}
+	if (after >= s.length() || s[after] != '(') {
+		return false;
+	}
+
+	/* kapanis parantezi: satirin sonunda olmali */
+	int depth = 0;
+	bool in_str = false;
+	int close = -1;
+	for (int j = after; j < s.length(); j++) {
+		CharType c = s[j];
+		if (c == '"') {
+			in_str = !in_str;
+		} else if (!in_str) {
+			if (c == '(') {
+				depth++;
+			} else if (c == ')') {
+				depth--;
+				if (depth == 0) {
+					close = j;
+					break;
+				}
+			}
+		}
+	}
+	if (close == -1 || close != s.length() - 1) {
+		return false;
+	}
+
+	if (seg == "Sleep") {
+		/* Non-blocking: OS::delay_usec MOTORU DONDURUR; kullanilmaz.
+		   execuctor_run_ex sleep_pending'i gorunce kalan satirlari + scope'u
+		   saklar ve break eder; gcl_script.cpp sure dolunca devami bir kez
+		   calistirir.
+		   LOCAL: Yalnizca ILK tetiklemede sure kurulur. Ayni Sleep satiri
+		   beklerken her frame yeniden geldiginde (ornek: Update her frame
+		   UpdateBody'i cagirir) sure KAYDIRILMAZ; aksi halde sure hic
+		   dolmaz ve kalan satirlar hic calismaz. */
+		if (!p_types.sleep_armed) {
+			String args_region = s.substr(after + 1, close - after - 1).strip_edges();
+			double secs = variant_real(solve_arith(args_region, p_members));
+			if (secs < 0.0) {
+				secs = 0.0;
+			}
+			p_types.sleep_pending = true;
+			p_types.sleep_armed = true;
+			p_types.sleep_until = (double)OS::get_singleton()->get_ticks_msec() + secs * 1000.0;
+		}
+		return true;
+	}
+
+	return false;
 }
 
 /* "self.<zincir>.<Metot>(args)" extern metod cagrisini isler.
