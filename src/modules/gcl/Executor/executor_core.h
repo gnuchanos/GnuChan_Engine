@@ -12,7 +12,13 @@
 
 #include "executor_format.h"
 
+#include "core/object.h"
+#include "core/os/input.h"
+#include "core/os/keyboard.h"
 #include "core/print_string.h"
+#include "scene/3d/fps_controller.h"
+#include "scene/3d/ray_cast.h"
+#include "scene/main/node.h"
 
 #include "executor_ops.h"
 
@@ -60,6 +66,113 @@ inline Vector<String> split_top_level(const String &p_text, CharType p_sep) {
 	return out;
 }
 
+/* Gercek Godot nesnesi uzerinde GCL uye adini cozer.
+   - FPSController: Raycast/Camera/Head/IsColliding/GetNode/GetBodyName/MoveSpeed...
+     (fps_controller.h referans sistemi: interaction_ray=head/Camera/RayCast)
+   - RayCast: IsColliding/GetBodyName/GetNode/length/Free (gcl.md @extern Raycast)
+   - Genel Object: property -> child node (harf duyarsiz) -> method cagrisi. */
+inline Variant resolve_object_member(Object *p_obj, const String &p_field) {
+	Variant out;
+
+	FPSController *fps = Object::cast_to<FPSController>(p_obj);
+	if (fps) {
+		if (p_field == "Raycast") {
+			RayCast *rc = fps->get_interaction_ray();
+			out = rc ? Variant((Object *)rc) : Variant();
+		} else if (p_field == "Camera") {
+			Camera *cam = fps->get_camera();
+			out = cam ? Variant((Object *)cam) : Variant();
+		} else if (p_field == "Head") {
+			Spatial *hd = fps->get_head();
+			out = hd ? Variant((Object *)hd) : Variant();
+		} else if (p_field == "IsColliding") {
+			out = fps->is_interaction_colliding();
+		} else if (p_field == "GetBodyName") {
+			Object *tg = fps->get_interaction_target();
+			out = tg ? tg->get("name") : Variant();
+		} else if (p_field == "GetNode") {
+			Object *tg = fps->get_interaction_target();
+			out = tg ? Variant(tg) : Variant();
+		} else if (p_field == "MoveSpeed") {
+			out = fps->get_walk_speed();
+		} else if (p_field == "DuckSpeed") {
+			out = fps->get_crouch_speed();
+		} else if (p_field == "RunSpeed") {
+			out = fps->get_run_speed();
+		} else if (p_field == "JumpHeight") {
+			out = fps->get_jump_impulse();
+		} else if (p_field == "Gravity") {
+			out = fps->get_gravity();
+		} else if (p_field == "IsRunning") {
+			out = Input::get_singleton()->is_physical_key_pressed(KEY_SHIFT);
+		} else if (p_field == "IsDucking") {
+			out = fps->is_crouching();
+		} else if (p_field == "IsJumping") {
+			out = !fps->is_on_ground();
+		} else if (p_field == "IsOnFloor") {
+			out = fps->is_on_ground();
+		} else {
+			out = p_obj->get(StringName(p_field));
+		}
+		return out;
+	}
+
+	RayCast *rc = Object::cast_to<RayCast>(p_obj);
+	if (rc) {
+		if (p_field == "IsColliding") {
+			out = rc->is_colliding();
+		} else if (p_field == "GetBodyName") {
+			Object *col = rc->get_collider();
+			out = col ? col->get("name") : Variant();
+		} else if (p_field == "GetNode") {
+			out = Variant((Object *)rc);
+		} else if (p_field == "length") {
+			out = rc->get_cast_to().length();
+		} else if (p_field == "Free") {
+			Variant::CallError ce;
+			p_obj->call("queue_free", nullptr, 0, ce);
+			out = Variant();
+		} else if (p_field == "Skip" || p_field == "SkipList") {
+			/* argumanli cagrilar: bu turde cozulmez, bos doner. */
+			out = Variant();
+		} else {
+			out = p_obj->get(StringName(p_field));
+		}
+		return out;
+	}
+
+	/* Genel Object: property; yoksa child node (harf duyarsiz); o da yoksa method. */
+	Variant member = p_obj->get(StringName(p_field));
+	if (member.get_type() == Variant::NIL) {
+		Node *node = Object::cast_to<Node>(p_obj);
+		if (node) {
+			Node *child = node->get_node_or_null(NodePath(p_field));
+			if (!child) {
+				String low_field = p_field.to_lower();
+				for (int ci = 0; ci < node->get_child_count(); ci++) {
+					Node *ch = node->get_child(ci);
+					if (ch && String(ch->get_name()).to_lower() == low_field) {
+						child = ch;
+						break;
+					}
+				}
+			}
+			if (child) {
+				out = Variant((Object *)child);
+			} else {
+				Variant::CallError ce;
+				out = p_obj->call(StringName(p_field), nullptr, 0, ce);
+			}
+		} else {
+			Variant::CallError ce;
+			out = p_obj->call(StringName(p_field), nullptr, 0, ce);
+		}
+	} else {
+		out = member;
+	}
+	return out;
+}
+
 /* "A.B[0].C" zincir ifadesini degerlendirir. */
 inline Variant evaluate_expr(const String &p_expr, const Map<StringName, Variant> &p_members) {
 	String expr = p_expr.strip_edges();
@@ -102,6 +215,8 @@ inline Variant evaluate_expr(const String &p_expr, const Map<StringName, Variant
 				} else {
 					return Variant();
 				}
+			} else if (cur.get_type() == Variant::OBJECT) {
+				cur = resolve_object_member((Object *)cur, field);
 			} else {
 				return Variant();
 			}
@@ -398,7 +513,6 @@ inline bool handle_preprocess(const String &p_line, Map<StringName, Variant> &p_
 			String args = s.substr(head_len).strip_edges();
 			String out = label;
 			Vector<String> parts = split_top_level(args, ',');
-			/* birden fazla "..." arka arkaya veya değişkenler: hepsini birleştir */
 			bool first = true;
 			for (int i = 0; i < parts.size(); i++) {
 				String part = parts[i].strip_edges();
@@ -433,7 +547,6 @@ inline bool handle_preprocess(const String &p_line, Map<StringName, Variant> &p_
 		return true;
 	}
 	if (s == "#elif" || s.begins_with("#elif ")) {
-		/* onceki dal pasifken degerlendir */
 		if (!r_region_active) {
 			String cond = s == "#elif" ? String() : s.substr(5).strip_edges();
 			bool val = false;
@@ -459,7 +572,6 @@ inline bool handle_preprocess(const String &p_line, Map<StringName, Variant> &p_
 		return true;
 	}
 	if (s == "#if" || s.begins_with("#if ")) {
-		/* basit: #if windows / #if linux / #if defined(NAME) */
 		String cond = s == "#if" ? String() : s.substr(3).strip_edges();
 		bool val = false;
 		if (cond == "windows") {
@@ -634,6 +746,124 @@ inline void handle_typedef_stmt(const String &p_stmt, Map<StringName, Variant> &
 			p_types.aliases[StringName(alias)] = orig;
 		}
 	}
+}
+
+/* "self.<zincir>.<Metot>(args)" extern metod cagrisini isler.
+   Ornek: self.Raycast.Skip(self) -> FPSController'un RayCast nesnesine erisir
+   ve Skip'i owner nesnesiyle cagirir. Boylece karakter kendi capsule'ine
+   takilip "Body Name: FPSController" spam'i basmaz.
+   Parantezsiz zincirler (self.Raycast.IsColliding vb.) evaluate_expr ile
+   cozulur; bu fonksiyon yalnizca parantezli METOD cagrilarini yapar. */
+inline bool handle_extern_call(const String &p_line, Map<StringName, Variant> &p_members, Variant *r_retval = nullptr) {
+	String s = p_line.strip_edges().replace(";", "").strip_edges();
+	if (!s.begins_with("self.") || s.find("(") == -1) {
+		return false;
+	}
+
+	Variant cur;
+	if (p_members.has(StringName("self"))) {
+		cur = p_members[StringName("self")];
+	}
+	if (cur.get_type() != Variant::OBJECT) {
+		return false;
+	}
+
+	/* "self." sonrasi zinciri segmentlere ayir;
+	   son segment "Metot(args)" ise Godot nesnesinde cagri yapilir. */
+	int pos = 5;
+	const int L = s.length();
+	while (pos < L) {
+		int seg_start = pos;
+		while (pos < L && is_ident_char(s[pos])) {
+			pos++;
+		}
+		if (pos == seg_start) {
+			return false;
+		}
+		String seg = s.substr(seg_start, pos - seg_start);
+
+		int after = pos;
+		while (after < L && (s[after] == ' ' || s[after] == '\t')) {
+			after++;
+		}
+
+		if (after < L && s[after] == '(') {
+			/* method cagrisi: parantez eslegini bul */
+			int depth = 0;
+			bool in_str = false;
+			int close = -1;
+			for (int j = after; j < L; j++) {
+				CharType c = s[j];
+				if (c == '"') {
+					in_str = !in_str;
+				} else if (!in_str && c == '(') {
+					depth++;
+				} else if (!in_str && c == ')') {
+					depth--;
+					if (depth == 0) {
+						close = j;
+						break;
+					}
+				}
+			}
+			if (close == -1 || close != L - 1) {
+				return false;
+			}
+
+			Object *obj = (Object *)cur;
+			if (!obj->has_method(seg)) {
+				return false;
+			}
+
+			/* argumanlari coz: "self" members'tan owner nesnesine donusur */
+			Array call_args;
+			String args_region = s.substr(after + 1, close - after - 1);
+			int a_start = 0;
+			for (int j = 0; j <= args_region.length(); j++) {
+				if (j == args_region.length() || args_region[j] == ',') {
+					String arg = args_region.substr(a_start, j - a_start).strip_edges();
+					if (!arg.empty()) {
+						call_args.push_back(initialize_value(arg, p_members));
+					}
+					a_start = j + 1;
+				}
+			}
+
+			Variant ret = obj->callv(seg, call_args);
+			if (r_retval) {
+				*r_retval = ret;
+			}
+			return true;
+		}
+
+		/* member erisimi: resolve_object_member zinciri cozer */
+		if (cur.get_type() == Variant::DICTIONARY) {
+			Dictionary d = cur;
+			if (!d.has(seg)) {
+				return false;
+			}
+			cur = d[seg];
+		} else if (cur.get_type() == Variant::OBJECT) {
+			cur = resolve_object_member((Object *)cur, seg);
+		} else {
+			return false;
+		}
+
+		while (pos < L && (s[pos] == ' ' || s[pos] == '\t')) {
+			pos++;
+		}
+		if (pos >= L) {
+			break;
+		}
+		if (s[pos] == '.') {
+			pos++;
+		} else if (s[pos] == '-' && pos + 1 < L && s[pos + 1] == '>') {
+			pos += 2;
+		} else {
+			return false;
+		}
+	}
+	return false;
 }
 
 } // namespace executor_core

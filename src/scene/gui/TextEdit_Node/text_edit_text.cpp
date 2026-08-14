@@ -1,0 +1,351 @@
+/**************************************************************************/
+/*  GnuChan Engine — TextEdit modular sources                             */
+/*                                                                        */
+/*  Godot 3.6 text_edit.cpp tek sorumluluk modullerine bolunmustur:        */
+/*    text_edit_text.cpp        - Text veri modeli + satir lambasi         */
+/*    text_edit_selection.cpp   - secim + minimap etkilesimi               */
+/*    text_edit_draw.cpp        - _notification + cizim                    */
+/*    text_edit_pair_indent.cpp - cift sembol / backspace / indent         */
+/*    text_edit_input.cpp       - _gui_input (klavye + fare)               */
+/*    text_edit_core.cpp        - scroll, imlec, wrap, giris metni         */
+/*    text_edit_position.cpp    - konum hesaplama + drag&drop + text API   */
+/*    text_edit_syntax.cpp      - syntax renklendirme + kes/kopyala/sec    */
+/*    text_edit_search.cpp      - arama + satir isaretleri                 */
+/*    text_edit_fold_undo.cpp   - katlama + undo/redo                      */
+/*    text_edit_completion.cpp  - OTOMATIK TAMAMLAMA (GCL kancali)         */
+/*    text_edit_misc.cpp        - tooltip / word / menu / gutter setter'lar*/
+/*    text_edit_bind.cpp        - _bind_methods + kurucu + yikici          */
+/**************************************************************************/
+
+#include "text_edit.h"
+#include "text_edit_helpers.h"
+
+#include "core/message_queue.h"
+#include "core/os/input.h"
+#include "core/os/keyboard.h"
+#include "core/os/os.h"
+#include "core/project_settings.h"
+#include "core/script_language.h"
+#include "label.h"
+#include "scene/main/viewport.h"
+
+#ifdef TOOLS_ENABLED
+#include "editor/editor_scale.h"
+#endif
+
+void TextEdit::Text::set_font(const Ref<Font> &p_font) {
+	font = p_font;
+}
+
+void TextEdit::Text::set_indent_size(int p_indent_size) {
+	indent_size = p_indent_size;
+}
+
+void TextEdit::Text::_update_line_cache(int p_line) const {
+	int w = 0;
+
+	int len = text[p_line].data.length();
+	const CharType *str = text[p_line].data.c_str();
+
+	// Update width.
+
+	for (int i = 0; i < len; i++) {
+		w += get_char_width(str[i], str[i + 1], w);
+	}
+
+	text.write[p_line].width_cache = w;
+
+	text.write[p_line].wrap_amount_cache = -1;
+
+	// Update regions.
+
+	text.write[p_line].region_info.clear();
+
+	for (int i = 0; i < len; i++) {
+		if (!_is_symbol(str[i])) {
+			continue;
+		}
+		if (str[i] == '\\') {
+			i++; // Skip quoted anything.
+			continue;
+		}
+
+		int left = len - i;
+
+		for (int j = 0; j < color_regions->size(); j++) {
+			const ColorRegion &cr = color_regions->operator[](j);
+
+			/* BEGIN */
+
+			int lr = cr.begin_key.length();
+			const CharType *kc;
+			bool match;
+
+			if (lr != 0 && lr <= left) {
+				kc = cr.begin_key.c_str();
+
+				match = true;
+
+				for (int k = 0; k < lr; k++) {
+					if (kc[k] != str[i + k]) {
+						match = false;
+						break;
+					}
+				}
+
+				if (match) {
+					ColorRegionInfo cri;
+					cri.end = false;
+					cri.region = j;
+					text.write[p_line].region_info[i] = cri;
+					i += lr - 1;
+
+					break;
+				}
+			}
+
+			/* END */
+
+			lr = cr.end_key.length();
+			if (lr != 0 && lr <= left) {
+				kc = cr.end_key.c_str();
+
+				match = true;
+
+				for (int k = 0; k < lr; k++) {
+					if (kc[k] != str[i + k]) {
+						match = false;
+						break;
+					}
+				}
+
+				if (match) {
+					ColorRegionInfo cri;
+					cri.end = true;
+					cri.region = j;
+					text.write[p_line].region_info[i] = cri;
+					i += lr - 1;
+
+					break;
+				}
+			}
+		}
+	}
+}
+
+const Map<int, TextEdit::Text::ColorRegionInfo> &TextEdit::Text::get_color_region_info(int p_line) const {
+	static Map<int, ColorRegionInfo> cri;
+	ERR_FAIL_INDEX_V(p_line, text.size(), cri);
+
+	if (text[p_line].width_cache == -1) {
+		_update_line_cache(p_line);
+	}
+
+	return text[p_line].region_info;
+}
+
+int TextEdit::Text::get_line_width(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), -1);
+
+	if (text[p_line].width_cache == -1) {
+		_update_line_cache(p_line);
+	}
+
+	return text[p_line].width_cache;
+}
+
+void TextEdit::Text::set_line_wrap_amount(int p_line, int p_wrap_amount) const {
+	ERR_FAIL_INDEX(p_line, text.size());
+
+	text.write[p_line].wrap_amount_cache = p_wrap_amount;
+}
+
+int TextEdit::Text::get_line_wrap_amount(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), -1);
+
+	return text[p_line].wrap_amount_cache;
+}
+
+void TextEdit::Text::clear_width_cache() {
+	for (int i = 0; i < text.size(); i++) {
+		text.write[i].width_cache = -1;
+	}
+}
+
+void TextEdit::Text::clear_wrap_cache() {
+	for (int i = 0; i < text.size(); i++) {
+		text.write[i].wrap_amount_cache = -1;
+	}
+}
+
+void TextEdit::Text::clear_info_icons() {
+	for (int i = 0; i < text.size(); i++) {
+		text.write[i].has_info = false;
+	}
+}
+
+void TextEdit::Text::clear() {
+	text.clear();
+	insert(0, "");
+}
+
+int TextEdit::Text::get_max_width(bool p_exclude_hidden) const {
+	// Quite some work, but should be fast enough.
+
+	int max = 0;
+	for (int i = 0; i < text.size(); i++) {
+		if (!p_exclude_hidden || !is_hidden(i)) {
+			max = MAX(max, get_line_width(i));
+		}
+	}
+	return max;
+}
+
+void TextEdit::Text::set(int p_line, const String &p_text) {
+	ERR_FAIL_INDEX(p_line, text.size());
+
+	text.write[p_line].width_cache = -1;
+	text.write[p_line].wrap_amount_cache = -1;
+	text.write[p_line].data = p_text;
+}
+
+void TextEdit::Text::insert(int p_at, const String &p_text) {
+	Line line;
+	line.marked = false;
+	line.safe = false;
+	line.breakpoint = false;
+	line.bookmark = false;
+	line.hidden = false;
+	line.has_info = false;
+	line.width_cache = -1;
+	line.wrap_amount_cache = -1;
+	line.data = p_text;
+	text.insert(p_at, line);
+}
+void TextEdit::Text::remove(int p_at) {
+	text.remove(p_at);
+}
+
+int TextEdit::Text::get_char_width(CharType c, CharType next_c, int px) const {
+	int tab_w = font->get_char_size(' ').width * indent_size;
+	int w = 0;
+
+	if (c == '\t') {
+		int left = px % tab_w;
+		if (left == 0) {
+			w = tab_w;
+		} else {
+			w = tab_w - px % tab_w; // Is right.
+		}
+	} else {
+		w = font->get_char_size(c, next_c).width;
+	}
+	return w;
+}
+
+void TextEdit::_update_scrollbars() {
+	Size2 size = get_size();
+	Size2 hmin = h_scroll->get_combined_minimum_size();
+	Size2 vmin = v_scroll->get_combined_minimum_size();
+
+	v_scroll->set_begin(Point2(size.width - vmin.width, cache.style_normal->get_margin(MARGIN_TOP)));
+	v_scroll->set_end(Point2(size.width, size.height - cache.style_normal->get_margin(MARGIN_TOP) - cache.style_normal->get_margin(MARGIN_BOTTOM)));
+
+	h_scroll->set_begin(Point2(0, size.height - hmin.height));
+	h_scroll->set_end(Point2(size.width - vmin.width, size.height));
+
+	int visible_rows = get_visible_rows();
+	int total_rows = get_total_visible_rows();
+	if (scroll_past_end_of_file_enabled) {
+		total_rows += visible_rows - 1;
+	}
+
+	int visible_width = size.width - cache.style_normal->get_minimum_size().width;
+	int total_width = text.get_max_width(true) + vmin.x;
+
+	if (line_numbers) {
+		total_width += cache.line_number_w;
+	}
+
+	if (draw_breakpoint_gutter || draw_bookmark_gutter) {
+		total_width += cache.breakpoint_gutter_width;
+	}
+
+	if (draw_info_gutter) {
+		total_width += cache.info_gutter_width;
+	}
+
+	if (draw_fold_gutter) {
+		total_width += cache.fold_gutter_width;
+	}
+
+	if (draw_minimap) {
+		total_width += cache.minimap_width;
+	}
+
+	updating_scrolls = true;
+
+	if (total_rows > visible_rows) {
+		v_scroll->show();
+		v_scroll->set_max(total_rows + get_visible_rows_offset());
+		v_scroll->set_page(visible_rows + get_visible_rows_offset());
+		if (smooth_scroll_enabled) {
+			v_scroll->set_step(0.25);
+		} else {
+			v_scroll->set_step(1);
+		}
+		set_v_scroll(get_v_scroll());
+
+	} else {
+		cursor.line_ofs = 0;
+		cursor.wrap_ofs = 0;
+		v_scroll->set_value(0);
+		v_scroll->set_max(0);
+		v_scroll->hide();
+	}
+
+	if (total_width > visible_width && !is_wrap_enabled()) {
+		h_scroll->show();
+		h_scroll->set_max(total_width);
+		h_scroll->set_page(visible_width);
+		if (cursor.x_ofs > (total_width - visible_width)) {
+			cursor.x_ofs = (total_width - visible_width);
+		}
+		if (fabs(h_scroll->get_value() - (double)cursor.x_ofs) >= 1) {
+			h_scroll->set_value(cursor.x_ofs);
+		}
+
+	} else {
+		cursor.x_ofs = 0;
+		h_scroll->set_value(0);
+		h_scroll->set_max(0);
+		h_scroll->hide();
+	}
+
+	updating_scrolls = false;
+}
+
+void TextEdit::_click_selection_held() {
+	// Warning: is_mouse_button_pressed(BUTTON_LEFT) returns false for double+ clicks, so this doesn't work for MODE_WORD
+	// and MODE_LINE. However, moving the mouse triggers _gui_input, which calls these functions too, so that's not a huge problem.
+	// I'm unsure if there's an actual fix that doesn't have a ton of side effects.
+	if (Input::get_singleton()->is_mouse_button_pressed(BUTTON_LEFT) && selection.selecting_mode != Selection::MODE_NONE) {
+		switch (selection.selecting_mode) {
+			case Selection::MODE_POINTER: {
+				_update_selection_mode_pointer();
+			} break;
+			case Selection::MODE_WORD: {
+				_update_selection_mode_word();
+			} break;
+			case Selection::MODE_LINE: {
+				_update_selection_mode_line();
+			} break;
+			default: {
+				break;
+			}
+		}
+	} else {
+		click_select_held->stop();
+	}
+}
+

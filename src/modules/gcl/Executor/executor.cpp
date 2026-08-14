@@ -248,6 +248,7 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 					bool known_type = is_number_keyword(type) || p_types.types.has(StringName(type)) ||
 							p_types.aliases.has(StringName(type)) || p_types.classes.has(StringName(type)) ||
 							type == "tuple" || type == "dict" || type == "struct" || type == "enum" || type == "union" ||
+							type == "NODE" || type == "REF" || type == "ABC" ||
 							type.begins_with("struct ") || type.begins_with("enum ") || type.begins_with("union ");
 
 					if (known_type) {
@@ -331,9 +332,16 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 			}
 
 			/* --- cikti / class / fonksiyon cagrilari --- */
-			if (!handle_call_full(stmt, p_members, p_types)) {
-				if (!resolve_class_call(stmt, p_members, p_types, nullptr)) {
-					resolve_user_call(stmt, p_members, p_types, nullptr);
+			/* self.<zincir>.<Metot>(args): "self.Raycast.Skip(self)" gibi
+			   extern metod cagrilarini once dene. resolve_user_call yalnizca
+			   duz "isim(args)" kalibini cozer; noktali zincirler daha once
+			   sessizce yutuluyordu - bu yuzden karakter kendi capsule'ine
+			   takilip "Body Name: FPSController" spam'i basiyordu. */
+			if (!handle_extern_call(stmt, p_members)) {
+				if (!handle_call_full(stmt, p_members, p_types)) {
+					if (!resolve_class_call(stmt, p_members, p_types, nullptr)) {
+						resolve_user_call(stmt, p_members, p_types, nullptr);
+					}
 				}
 			}
 		}

@@ -45,8 +45,15 @@ int printf_format_count();
 /* Extern modulu: "@extern <node>" satirlarini tarar. */
 void extern_scan(const String &p_code, Vector<String> &r_nodes);
 
-/* Variable modulu: "<tip> <isim>" tanimlarini tarar (sayi tipleri + int/float/etc). */
+/* Variable modulu: "<tip> <isim>" tanimlarini tarar (sayi tipleri + int/float/etc).
+   Fonksiyon imza satirlarindaki parametreler GLOBAL listeye girmez. */
 void variable_scan(const String &p_code, Vector<String> &r_names);
+
+/* Imlecin bulundugu fonksiyonun parametre adlarini toplar (scoped).
+   p_offset: imlecin p_code icindeki karakter konumu. Birden fazla fonksiyon
+   olsa bile yalnizca EN SON acilmis fonksiyonun parametreleri dondurulur;
+   boylece 'delta' hicbir zaman 2+ kere onerilmez. */
+void function_params_scan(const String &p_code, int p_offset, Vector<String> &r_names);
 
 template <class TParser>
 struct ParserResult {

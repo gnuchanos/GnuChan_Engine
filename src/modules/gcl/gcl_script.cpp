@@ -147,6 +147,11 @@ Variant GCLScriptInstance::call(const StringName &p_method, const Variant **p_ar
 		   Update/UpdatePhysics her kare cagrildigi icin global atamalarin
 		   tekrarlanmasi counter/sum'u sifirlar ve CHILD("ali") gibi instance
 		   kurulumlari her frame'de yeniden calisir. */
+		/* self sistemi: script'in bagli oldugu Godot nesnesini members'a yaz.
+		   self.Raycast.IsColliding gibi zincirler executor_core::evaluate_expr
+		   icinde OBJECT uzerinden cozulur. */
+		members[StringName("self")] = owner ? Variant((Object *)owner) : Variant();
+
 		if (p_method == "Ready") {
 			String global_code = executor_strip_bodies(code);
 			executor_run(global_code, members, types);
@@ -225,8 +230,11 @@ String GCLScriptLanguage::make_function(const String &p_class, const String &p_n
 }
 
 Error GCLScriptLanguage::complete_code(const String &p_code, const String &p_path, Object *p_owner, List<ScriptCodeCompletionOption> *r_options, bool &r_force, String &r_call_hint) {
-	r_force = false;
+	/* r_force = true: Ctrl+Space / tamamlama tetigi her durumda pencereyi
+	   acsin. false iken editor bazi durumlarda listeyi hic gostermiyordu. */
+	r_force = true;
 	r_call_hint = String();
+
 	return autocomplete_run(p_code, p_owner, r_options);
 }
 

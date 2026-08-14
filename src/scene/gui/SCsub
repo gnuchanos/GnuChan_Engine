@@ -2,4 +2,20 @@
 
 Import("env")
 
-env.add_source_files(env.scene_sources, "*.cpp")
+# TextEdit moduler yapi: moduller 'TextEdit_Node/' alt klasorunde toplanmistir
+# ve build O klasorden derlenir.
+#
+#   TextEdit_Node/text_edit_*.cpp -> 13 modul dosya (build'e dahil)
+#   _text_edit.cpp                -> orijinal tek-dosya yedek. KOKTE, build DISI.
+#
+# Alt klasorde derlenen moduller 'label.h' gibi baska gui basliklarini
+# '#include "label.h"' ile cagirirlar; derleyici once modulun kendi dizinini
+# arar (TextEdit_Node/), bulamaz. Bu yuzden gui KOKU include yoluna eklenir.
+# Ayrica editor/main dosyalari '#include "scene/gui/text_edit.h"' kullanir;
+# bu da SRC KOKU ('src/') include yolunda olmalidir.
+env.Append(CPPPATH=[Dir("."), Dir("../..")])
+env.add_source_files(env.scene_sources, Glob("TextEdit_Node/*.cpp"))
+# Kok glob: '_' ile baslayan (orijinal _text_edit.cpp yedegi) build DISI.
+# Modul .cpp dosyalari yalnizca TextEdit_Node/'dan derlenir (kokte yoktur).
+sources = [s for s in Glob("*.cpp") if not str(s).startswith("_")]
+env.add_source_files(env.scene_sources, sources)

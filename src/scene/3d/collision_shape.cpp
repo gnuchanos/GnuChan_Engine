@@ -178,6 +178,16 @@ void CollisionShape::set_shape(const Ref<Shape> &p_shape) {
 	if (!shape.is_null()) {
 		shape->register_owner(this);
 	}
+	/* GnuChan default kapsul: CapsuleShape Z ekseni boyunca uzanir, dik
+	 * durmasi icin CollisionShape X ekseninde 90 derece dondurulur ve merkezi
+	 * y=1.331'e oturtulur. Bu varsayilanlar body turunden bagimsiz olarak
+	 * (StaticBody, KinematicBody, Area, vb.) KAPSULLE her eslesmede uygulanir. */
+	if (!shape.is_null() && Object::cast_to<CapsuleShape>(*shape)) {
+		set_rotation(Vector3(Math::deg2rad(90.0), 0, 0)); // rotate X 90 derece: dik durur
+		Vector3 pos = get_translation();
+		pos.y = 1.331; // pozisyon y: merkez 1.331 (taban ~0)
+		set_translation(pos);
+	}
 	update_gizmo();
 	if (parent) {
 		parent->shape_owner_clear_shapes(owner_id);

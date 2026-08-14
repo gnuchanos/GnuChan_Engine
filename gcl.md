@@ -1,47 +1,14 @@
 # gcl_language..md icinde temel dil tasarimi var fakat gcl.md icinde motor odakli kisim var
 
-@extern NODE_Name -> her node kendi @extern ile self. degerlerini tutar
+her @extern Node girisi python class gibi class icinde self. ile erisilebilir degerler vardir
 
-#// ERISIM KURALI
-#// self.         -> @extern node unun ORIGINAL parametreleri (Position, Name, GetNode, Free ...)
-#// self.Raycast. -> "Raycast node'una git" demek; sonrasinda o node'un ORIGINAL parametreleri
-#//                  self.Raycast.GetNode -> Raycast node'unun kendi GetNode'u cagrilir
-#// REF.GetChild.Find("cube1"). -> Find'in verdigi node hangi tur ise onun parametreleri gelir
+ornek @extern FPSController
 
-#// ============================================================
-#// OTOMATIK TAMAMLAMA KURALLARI (gcl_completion.cpp)
-#// ============================================================
-#// 1) self. ne onerir?  Script'in basindaki @extern etiketi belirler:
-#//    - @extern FPSController  -> FPSController alanlari + referanslari
-#//      (MoveSpeed, DuckSpeed, RunSpeed, JumpHeight, StandingHeight,
-#//       CrouchHeight, Gravity, FallSpeed, IsRunning, IsDucking,
-#//       IsJumping, IsPaused, IsOnFloor, Raycast, Camera, Head)
-#//    - @extern Spatial / diger node -> sadece node'un kendi parametreleri:
-#//      Position, Rotation, Scale, Transform, GetNode, Find,
-#//      Hide, Show, Free, Enable, Disable
-#//      (Material/Name/Childs/GetChild YOKTUR - node'a gitmeden ulasilmaz)
-#//
-#// 2) Node'a gitmeden o node'un alt parametreleri ONERILMEZ:
-#//    - self.Material    -> yanlis (Spatial material tutmaz)
-#//    - self.Name        -> yanlis (name icin once node'a git)
-#//    - self.Childs      -> yanlis (child icin once node'a git)
-#//    - self.GetChild    -> yanlis (child icin once node'a git)
-#//    Dogrusu: self.GetNode("..."). veya self.GetNode("...").Find("x").
-#//    Sonrasinda o node hangi turde ise onun parametreleri gelir.
-#//
-#// 3) self.Raycast. -> @extern Raycast parametreleri:
-#//    IsColliding, GetBodyName, length, Skip, SkipList, GetNode, Free
-#// 4) self.Camera.  -> @extern Camera parametreleri:
-#//    Fov, MouseSpeed, HeadBob, HeadBobSpeed, HeadBobAmount, RunFovChange, GetNode
-#// 5) self.Head.    -> Camera (Head altinda camera var)
-#// 6) self.Material. -> material parametreleri (Color, Albedo, Metallic,
-#//    Roughness, Emission, NormalMap, AO, Opacity, Transparent, ...)
-#// 7) Input. -> IsPressed, IsUp, IsDown
-#// 8) Engine. -> GetFPS, SetFPS, GetScreenSize, GetWindowSize
-#// 9) NODE, ABC, REF gibi tipler -> GetNode/GetChild/Find sonrasi:
-#//    Name, Position, Rotation, Scale, Transform, Material, Childs,
-#//    GetChild, GetNode, Find, Hide, Show, Free, Enable, Disable
-#// ============================================================
+self. dediginde fpsconrollerin icindeki temel degerlere erisirsin
+self.Raycast fpscontrollerin referans gosterdigi diger class node sahnede hazr duruyor
+self.Camera da ayni mantik
+
+self.Raycast.GetNode ile cagrilan nodelarin kendi ozellikleri olabilir ornek child icinde mesh, collision ... classlari olabilir ozetle @extern python class gibi calisiyor
 
 #// Hazir fonksiyonlar
 void Ready() {
@@ -108,42 +75,42 @@ ABC.GetChild.Find("ali").Enable
     self.GetNode
 
 @extern Mesh #// 3d mesh instance
-    REF.Transform         --> Local yada Global secenek
-    REF.Position.         --> .y, .x, .z
-    REF.Rotation.         --> .y, .x, .z
-    REF.Scale.            --> .y, .x, .z
-    REF.Name              --> call
-    REF.Material.Color            --> rgb
-    REF.Material.Albedo           --> preload("path/image"); or load("path/image");
-    REF.Material.Metallic         --> 0..1
-    REF.Material.Metallic.Specular --> 0..1 (metalik bilesen; 1.0 = pure metal)
-    REF.Material.Metallic.Texture --> doku
-    REF.Material.Roughness        --> 0..1
-    REF.Material.Roughness.Texture --> doku
-    REF.Material.Emission         --> 0..1 (parlama guclu)
-    REF.Material.EmissionColor    --> rgb (isik rengi)
-    REF.Material.EmissionTexture  --> doku
-    REF.Material.NormalMap.Enable --> true/false
-    REF.Material.NormalMap.Scale  --> 0..1 (normal girinti guclu)
-    REF.Material.NormalMap.Texture--> doku
-    REF.Material.AO              --> 0..1 (ambient occlusion, kose karaltisi)
-    REF.Material.AO.Texture      --> doku
-    REF.Material.Opacity         --> 0..1 (saydamlik; 1.0 = opak)
-    REF.Material.Transparent     --> true/false (alfa karisimini acar)
-    REF.Material.CastShadows     --> true/false (golge dusursun mu)
-    REF.Material.DoubleSided     --> true/false (iki yuzluluk)
-    REF.Material.CullBackface    --> true/false (arka yuzu at)
-    REF.Material.BlendMode       --> mix/add/sub/mul (karisim modu)
-    REF.Material.ShadingMode     --> unshaded/per-pixel (dokulu gorsel)
-    REF.Material.UV1Offset       --> x,y (doku kaydirma)
-    REF.Material.UV1Scale        --> x,y (doku olcegi / tekrari)
-    REF.Material.Detail.Albedo   --> detay katmani dokusu (uzaktan doku katmani)
-    REF.Material.Detail.Roughness--> detay roughness dokusu
-    REF.Material.Detail.Normal   --> detay normal dokusu
-    REF.Material.Clear()         --> varsayilan ayarlara don
-    REF.Material.Copy(REF.Material) --> baska materialdan kopyala
-    REF.Material.Save("res://path/material.tres") --> materiali dosyaya kaydet
-    REF.Material.Load("res://path/material.tres") --> materiali dosyadan yukle
+    self.Transform         --> Local yada Global secenek
+    self.Position.         --> .y, .x, .z
+    self.Rotation.         --> .y, .x, .z
+    self.Scale.            --> .y, .x, .z
+    self.Name              --> call
+    self.Material.Color            --> rgb
+    self.Material.Albedo           --> preload("path/image"); or load("path/image");
+    self.Material.Metallic         --> 0..1
+    self.Material.Metallic.Specular --> 0..1 (metalik bilesen; 1.0 = pure metal)
+    self.Material.Metallic.Texture --> doku
+    self.Material.Roughness        --> 0..1
+    self.Material.Roughness.Texture --> doku
+    self.Material.Emission         --> 0..1 (parlama guclu)
+    self.Material.EmissionColor    --> rgb (isik rengi)
+    self.Material.EmissionTexture  --> doku
+    self.Material.NormalMap.Enable --> true/false
+    self.Material.NormalMap.Scale  --> 0..1 (normal girinti guclu)
+    self.Material.NormalMap.Texture--> doku
+    self.Material.AO              --> 0..1 (ambient occlusion, kose karaltisi)
+    self.Material.AO.Texture      --> doku
+    self.Material.Opacity         --> 0..1 (saydamlik; 1.0 = opak)
+    self.Material.Transparent     --> true/false (alfa karisimini acar)
+    self.Material.CastShadows     --> true/false (golge dusursun mu)
+    self.Material.DoubleSided     --> true/false (iki yuzluluk)
+    self.Material.CullBackface    --> true/false (arka yuzu at)
+    self.Material.BlendMode       --> mix/add/sub/mul (karisim modu)
+    self.Material.ShadingMode     --> unshaded/per-pixel (dokulu gorsel)
+    self.Material.UV1Offset       --> x,y (doku kaydirma)
+    self.Material.UV1Scale        --> x,y (doku olcegi / tekrari)
+    self.Material.Detail.Albedo   --> detay katmani dokusu (uzaktan doku katmani)
+    self.Material.Detail.Roughness--> detay roughness dokusu
+    self.Material.Detail.Normal   --> detay normal dokusu
+    self.Material.Clear()         --> varsayilan ayarlara don
+    self.Material.Copy(REF.Material) --> baska materialdan kopyala
+    self.Material.Save("res://path/material.tres") --> materiali dosyaya kaydet
+    self.Material.Load("res://path/material.tres") --> materiali dosyadan yukle
 
 @extern FPSController
     #// surukle birak yapicagimiz referanslar FPSController buradaki referans nodelari kontrol ediyor duzenliyor ve kullaniyor

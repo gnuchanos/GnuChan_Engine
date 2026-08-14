@@ -113,7 +113,10 @@ void CapsuleShape::_bind_methods() {
 
 CapsuleShape::CapsuleShape() :
 		Shape(RID_PRIME(PhysicsServer::get_singleton()->shape_create(PhysicsServer::SHAPE_CAPSULE))) {
-	radius = 1.0;
-	height = 1.0;
+	/* GnuChan default kapsul olculeri: radius 0.424, height 1.8.
+	 * CapsuleShape Z ekseni boyunca uzanir; CollisionShape'te rotate 90 ve
+	 * y=1.331 varsayilanlari body turunden bagimsiz olarak uygulanir. */
+	radius = 0.424;
+	height = 1.8;
 	_update_shape();
 }

@@ -1,0 +1,613 @@
+/**************************************************************************/
+/*  GnuChan Engine — TextEdit modular sources                             */
+/*                                                                        */
+/*  Godot 3.6 text_edit.cpp tek sorumluluk modullerine bolunmustur:        */
+/*    text_edit_text.cpp        - Text veri modeli + satir lambasi         */
+/*    text_edit_selection.cpp   - secim + minimap etkilesimi               */
+/*    text_edit_draw.cpp        - _notification + cizim                    */
+/*    text_edit_pair_indent.cpp - cift sembol / backspace / indent         */
+/*    text_edit_input.cpp       - _gui_input (klavye + fare)               */
+/*    text_edit_core.cpp        - scroll, imlec, wrap, giris metni         */
+/*    text_edit_position.cpp    - konum hesaplama + drag&drop + text API   */
+/*    text_edit_syntax.cpp      - syntax renklendirme + kes/kopyala/sec    */
+/*    text_edit_search.cpp      - arama + satir isaretleri                 */
+/*    text_edit_fold_undo.cpp   - katlama + undo/redo                      */
+/*    text_edit_completion.cpp  - OTOMATIK TAMAMLAMA (GCL kancali)         */
+/*    text_edit_misc.cpp        - tooltip / word / menu / gutter setter'lar*/
+/*    text_edit_bind.cpp        - _bind_methods + kurucu + yikici          */
+/**************************************************************************/
+
+#include "text_edit.h"
+#include "text_edit_helpers.h"
+
+#include "core/message_queue.h"
+#include "core/os/input.h"
+#include "core/os/keyboard.h"
+#include "core/os/os.h"
+#include "core/project_settings.h"
+#include "core/script_language.h"
+#include "label.h"
+#include "scene/main/viewport.h"
+
+#ifdef TOOLS_ENABLED
+#include "editor/editor_scale.h"
+#endif
+
+void TextEdit::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_gui_input"), &TextEdit::_gui_input);
+	ClassDB::bind_method(D_METHOD("_scroll_moved"), &TextEdit::_scroll_moved);
+	ClassDB::bind_method(D_METHOD("_cursor_changed_emit"), &TextEdit::_cursor_changed_emit);
+	ClassDB::bind_method(D_METHOD("_text_changed_emit"), &TextEdit::_text_changed_emit);
+	ClassDB::bind_method(D_METHOD("_push_current_op"), &TextEdit::_push_current_op);
+	ClassDB::bind_method(D_METHOD("_click_selection_held"), &TextEdit::_click_selection_held);
+	ClassDB::bind_method(D_METHOD("_toggle_draw_caret"), &TextEdit::_toggle_draw_caret);
+	ClassDB::bind_method(D_METHOD("_v_scroll_input"), &TextEdit::_v_scroll_input);
+	ClassDB::bind_method(D_METHOD("_update_wrap_at"), &TextEdit::_update_wrap_at);
+
+	BIND_ENUM_CONSTANT(SEARCH_MATCH_CASE);
+	BIND_ENUM_CONSTANT(SEARCH_WHOLE_WORDS);
+	BIND_ENUM_CONSTANT(SEARCH_BACKWARDS);
+
+	BIND_ENUM_CONSTANT(SEARCH_RESULT_COLUMN);
+	BIND_ENUM_CONSTANT(SEARCH_RESULT_LINE);
+
+	/*
+        ClassDB::bind_method(D_METHOD("delete_char"),&TextEdit::delete_char);
+        ClassDB::bind_method(D_METHOD("delete_line"),&TextEdit::delete_line);
+    */
+
+	ClassDB::bind_method(D_METHOD("set_text", "text"), &TextEdit::set_text);
+	ClassDB::bind_method(D_METHOD("insert_text_at_cursor", "text"), &TextEdit::insert_text_at_cursor);
+
+	ClassDB::bind_method(D_METHOD("get_line_count"), &TextEdit::get_line_count);
+	ClassDB::bind_method(D_METHOD("get_text"), &TextEdit::get_text);
+	ClassDB::bind_method(D_METHOD("get_line", "line"), &TextEdit::get_line);
+	ClassDB::bind_method(D_METHOD("set_line", "line", "new_text"), &TextEdit::set_line);
+	ClassDB::bind_method(D_METHOD("get_line_wrapped_text", "line"), &TextEdit::get_wrap_rows_text);
+
+	ClassDB::bind_method(D_METHOD("get_line_width", "line", "wrap_index"), &TextEdit::get_line_width, DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("get_line_height"), &TextEdit::get_line_height);
+
+	ClassDB::bind_method(D_METHOD("is_line_wrapped", "line"), &TextEdit::line_wraps);
+	ClassDB::bind_method(D_METHOD("get_line_wrap_count", "line"), &TextEdit::times_line_wraps);
+
+	ClassDB::bind_method(D_METHOD("center_viewport_to_cursor"), &TextEdit::center_viewport_to_cursor);
+	ClassDB::bind_method(D_METHOD("cursor_set_column", "column", "adjust_viewport"), &TextEdit::cursor_set_column, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("cursor_set_line", "line", "adjust_viewport", "can_be_hidden", "wrap_index"), &TextEdit::cursor_set_line, DEFVAL(true), DEFVAL(true), DEFVAL(0));
+
+	ClassDB::bind_method(D_METHOD("cursor_get_column"), &TextEdit::cursor_get_column);
+	ClassDB::bind_method(D_METHOD("cursor_get_line"), &TextEdit::cursor_get_line);
+	ClassDB::bind_method(D_METHOD("cursor_set_blink_enabled", "enable"), &TextEdit::cursor_set_blink_enabled);
+	ClassDB::bind_method(D_METHOD("cursor_get_blink_enabled"), &TextEdit::cursor_get_blink_enabled);
+	ClassDB::bind_method(D_METHOD("cursor_set_blink_speed", "blink_speed"), &TextEdit::cursor_set_blink_speed);
+	ClassDB::bind_method(D_METHOD("cursor_get_blink_speed"), &TextEdit::cursor_get_blink_speed);
+	ClassDB::bind_method(D_METHOD("cursor_set_block_mode", "enable"), &TextEdit::cursor_set_block_mode);
+	ClassDB::bind_method(D_METHOD("cursor_is_block_mode"), &TextEdit::cursor_is_block_mode);
+
+	ClassDB::bind_method(D_METHOD("set_right_click_moves_caret", "enable"), &TextEdit::set_right_click_moves_caret);
+	ClassDB::bind_method(D_METHOD("is_right_click_moving_caret"), &TextEdit::is_right_click_moving_caret);
+
+	/* Line and character position. */
+	ClassDB::bind_method(D_METHOD("get_pos_at_line_column", "line", "column"), &TextEdit::get_pos_at_line_column);
+	ClassDB::bind_method(D_METHOD("get_rect_at_line_column", "line", "column"), &TextEdit::get_rect_at_line_column);
+	ClassDB::bind_method(D_METHOD("get_line_column_at_pos", "position"), &TextEdit::get_line_column_at_pos);
+
+	ClassDB::bind_method(D_METHOD("set_readonly", "enable"), &TextEdit::set_readonly);
+	ClassDB::bind_method(D_METHOD("is_readonly"), &TextEdit::is_readonly);
+
+	ClassDB::bind_method(D_METHOD("set_wrap_enabled", "enable"), &TextEdit::set_wrap_enabled);
+	ClassDB::bind_method(D_METHOD("is_wrap_enabled"), &TextEdit::is_wrap_enabled);
+	ClassDB::bind_method(D_METHOD("set_context_menu_enabled", "enable"), &TextEdit::set_context_menu_enabled);
+	ClassDB::bind_method(D_METHOD("is_context_menu_enabled"), &TextEdit::is_context_menu_enabled);
+	ClassDB::bind_method(D_METHOD("set_shortcut_keys_enabled", "enable"), &TextEdit::set_shortcut_keys_enabled);
+	ClassDB::bind_method(D_METHOD("is_shortcut_keys_enabled"), &TextEdit::is_shortcut_keys_enabled);
+	ClassDB::bind_method(D_METHOD("set_virtual_keyboard_enabled", "enable"), &TextEdit::set_virtual_keyboard_enabled);
+	ClassDB::bind_method(D_METHOD("is_virtual_keyboard_enabled"), &TextEdit::is_virtual_keyboard_enabled);
+	ClassDB::bind_method(D_METHOD("set_middle_mouse_paste_enabled", "enable"), &TextEdit::set_middle_mouse_paste_enabled);
+	ClassDB::bind_method(D_METHOD("is_middle_mouse_paste_enabled"), &TextEdit::is_middle_mouse_paste_enabled);
+	ClassDB::bind_method(D_METHOD("set_selecting_enabled", "enable"), &TextEdit::set_selecting_enabled);
+	ClassDB::bind_method(D_METHOD("is_selecting_enabled"), &TextEdit::is_selecting_enabled);
+	ClassDB::bind_method(D_METHOD("set_deselect_on_focus_loss_enabled", "enable"), &TextEdit::set_deselect_on_focus_loss_enabled);
+	ClassDB::bind_method(D_METHOD("is_deselect_on_focus_loss_enabled"), &TextEdit::is_deselect_on_focus_loss_enabled);
+	ClassDB::bind_method(D_METHOD("set_drag_and_drop_selection_enabled", "enable"), &TextEdit::set_drag_and_drop_selection_enabled);
+	ClassDB::bind_method(D_METHOD("is_drag_and_drop_selection_enabled"), &TextEdit::is_drag_and_drop_selection_enabled);
+	ClassDB::bind_method(D_METHOD("is_line_set_as_safe", "line"), &TextEdit::is_line_set_as_safe);
+	ClassDB::bind_method(D_METHOD("set_line_as_safe", "line", "safe"), &TextEdit::set_line_as_safe);
+	ClassDB::bind_method(D_METHOD("is_line_set_as_bookmark", "line"), &TextEdit::is_line_set_as_bookmark);
+	ClassDB::bind_method(D_METHOD("set_line_as_bookmark", "line", "bookmark"), &TextEdit::set_line_as_bookmark);
+	ClassDB::bind_method(D_METHOD("set_line_as_breakpoint", "line", "breakpoint"), &TextEdit::set_line_as_breakpoint);
+	ClassDB::bind_method(D_METHOD("is_line_set_as_breakpoint", "line"), &TextEdit::is_line_set_as_breakpoint);
+
+	ClassDB::bind_method(D_METHOD("cut"), &TextEdit::cut);
+	ClassDB::bind_method(D_METHOD("copy"), &TextEdit::copy);
+	ClassDB::bind_method(D_METHOD("paste"), &TextEdit::paste);
+
+	ClassDB::bind_method(D_METHOD("select", "from_line", "from_column", "to_line", "to_column"), &TextEdit::select);
+	ClassDB::bind_method(D_METHOD("select_all"), &TextEdit::select_all);
+	ClassDB::bind_method(D_METHOD("deselect"), &TextEdit::deselect);
+
+	ClassDB::bind_method(D_METHOD("is_selection_active"), &TextEdit::is_selection_active);
+	ClassDB::bind_method(D_METHOD("get_selection_from_line"), &TextEdit::get_selection_from_line);
+	ClassDB::bind_method(D_METHOD("get_selection_from_column"), &TextEdit::get_selection_from_column);
+	ClassDB::bind_method(D_METHOD("get_selection_to_line"), &TextEdit::get_selection_to_line);
+	ClassDB::bind_method(D_METHOD("get_selection_to_column"), &TextEdit::get_selection_to_column);
+	ClassDB::bind_method(D_METHOD("get_selection_text"), &TextEdit::get_selection_text);
+	ClassDB::bind_method(D_METHOD("is_mouse_over_selection", "edges"), &TextEdit::is_mouse_over_selection);
+	ClassDB::bind_method(D_METHOD("get_word_under_cursor"), &TextEdit::get_word_under_cursor);
+	ClassDB::bind_method(D_METHOD("search", "key", "flags", "from_line", "from_column"), &TextEdit::_search_bind);
+
+	ClassDB::bind_method(D_METHOD("has_undo"), &TextEdit::has_undo);
+	ClassDB::bind_method(D_METHOD("has_redo"), &TextEdit::has_redo);
+	ClassDB::bind_method(D_METHOD("undo"), &TextEdit::undo);
+	ClassDB::bind_method(D_METHOD("redo"), &TextEdit::redo);
+	ClassDB::bind_method(D_METHOD("clear_undo_history"), &TextEdit::clear_undo_history);
+
+	ClassDB::bind_method(D_METHOD("set_show_line_numbers", "enable"), &TextEdit::set_show_line_numbers);
+	ClassDB::bind_method(D_METHOD("is_show_line_numbers_enabled"), &TextEdit::is_show_line_numbers_enabled);
+	ClassDB::bind_method(D_METHOD("set_draw_tabs", "enable"), &TextEdit::set_draw_tabs);
+	ClassDB::bind_method(D_METHOD("is_drawing_tabs"), &TextEdit::is_drawing_tabs);
+	ClassDB::bind_method(D_METHOD("set_draw_spaces", "enable"), &TextEdit::set_draw_spaces);
+	ClassDB::bind_method(D_METHOD("is_drawing_spaces"), &TextEdit::is_drawing_spaces);
+	ClassDB::bind_method(D_METHOD("set_bookmark_gutter_enabled", "enable"), &TextEdit::set_bookmark_gutter_enabled);
+	ClassDB::bind_method(D_METHOD("is_bookmark_gutter_enabled"), &TextEdit::is_bookmark_gutter_enabled);
+	ClassDB::bind_method(D_METHOD("set_breakpoint_gutter_enabled", "enable"), &TextEdit::set_breakpoint_gutter_enabled);
+	ClassDB::bind_method(D_METHOD("is_breakpoint_gutter_enabled"), &TextEdit::is_breakpoint_gutter_enabled);
+	ClassDB::bind_method(D_METHOD("set_draw_fold_gutter", "enable"), &TextEdit::set_draw_fold_gutter);
+	ClassDB::bind_method(D_METHOD("is_drawing_fold_gutter"), &TextEdit::is_drawing_fold_gutter);
+	ClassDB::bind_method(D_METHOD("get_total_gutter_width"), &TextEdit::get_total_gutter_width);
+	ClassDB::bind_method(D_METHOD("get_visible_rows"), &TextEdit::get_visible_rows);
+	ClassDB::bind_method(D_METHOD("get_total_visible_rows"), &TextEdit::get_total_visible_rows);
+
+	ClassDB::bind_method(D_METHOD("set_hiding_enabled", "enable"), &TextEdit::set_hiding_enabled);
+	ClassDB::bind_method(D_METHOD("is_hiding_enabled"), &TextEdit::is_hiding_enabled);
+	ClassDB::bind_method(D_METHOD("set_line_as_hidden", "line", "enable"), &TextEdit::set_line_as_hidden);
+	ClassDB::bind_method(D_METHOD("is_line_hidden", "line"), &TextEdit::is_line_hidden);
+	ClassDB::bind_method(D_METHOD("fold_all_lines"), &TextEdit::fold_all_lines);
+	ClassDB::bind_method(D_METHOD("unhide_all_lines"), &TextEdit::unhide_all_lines);
+	ClassDB::bind_method(D_METHOD("fold_line", "line"), &TextEdit::fold_line);
+	ClassDB::bind_method(D_METHOD("unfold_line", "line"), &TextEdit::unfold_line);
+	ClassDB::bind_method(D_METHOD("toggle_fold_line", "line"), &TextEdit::toggle_fold_line);
+	ClassDB::bind_method(D_METHOD("can_fold", "line"), &TextEdit::can_fold);
+	ClassDB::bind_method(D_METHOD("is_folded", "line"), &TextEdit::is_folded);
+
+	ClassDB::bind_method(D_METHOD("set_highlight_all_occurrences", "enable"), &TextEdit::set_highlight_all_occurrences);
+	ClassDB::bind_method(D_METHOD("is_highlight_all_occurrences_enabled"), &TextEdit::is_highlight_all_occurrences_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_override_selected_font_color", "override"), &TextEdit::set_override_selected_font_color);
+	ClassDB::bind_method(D_METHOD("is_overriding_selected_font_color"), &TextEdit::is_overriding_selected_font_color);
+
+	ClassDB::bind_method(D_METHOD("set_syntax_coloring", "enable"), &TextEdit::set_syntax_coloring);
+	ClassDB::bind_method(D_METHOD("is_syntax_coloring_enabled"), &TextEdit::is_syntax_coloring_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_highlight_current_line", "enabled"), &TextEdit::set_highlight_current_line);
+	ClassDB::bind_method(D_METHOD("is_highlight_current_line_enabled"), &TextEdit::is_highlight_current_line_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_smooth_scroll_enable", "enable"), &TextEdit::set_smooth_scroll_enabled);
+	ClassDB::bind_method(D_METHOD("is_smooth_scroll_enabled"), &TextEdit::is_smooth_scroll_enabled);
+	ClassDB::bind_method(D_METHOD("set_v_scroll_speed", "speed"), &TextEdit::set_v_scroll_speed);
+	ClassDB::bind_method(D_METHOD("get_v_scroll_speed"), &TextEdit::get_v_scroll_speed);
+	ClassDB::bind_method(D_METHOD("set_v_scroll", "value"), &TextEdit::set_v_scroll);
+	ClassDB::bind_method(D_METHOD("get_v_scroll"), &TextEdit::get_v_scroll);
+	ClassDB::bind_method(D_METHOD("set_h_scroll", "value"), &TextEdit::set_h_scroll);
+	ClassDB::bind_method(D_METHOD("get_h_scroll"), &TextEdit::get_h_scroll);
+
+	ClassDB::bind_method(D_METHOD("add_keyword_color", "keyword", "color"), &TextEdit::add_keyword_color);
+	ClassDB::bind_method(D_METHOD("has_keyword_color", "keyword"), &TextEdit::has_keyword_color);
+	ClassDB::bind_method(D_METHOD("get_keyword_color", "keyword"), &TextEdit::get_keyword_color);
+	ClassDB::bind_method(D_METHOD("add_color_region", "begin_key", "end_key", "color", "line_only"), &TextEdit::add_color_region, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("clear_colors"), &TextEdit::clear_colors);
+	ClassDB::bind_method(D_METHOD("menu_option", "option"), &TextEdit::menu_option);
+	ClassDB::bind_method(D_METHOD("get_menu"), &TextEdit::get_menu);
+
+	ClassDB::bind_method(D_METHOD("get_breakpoints"), &TextEdit::get_breakpoints_array);
+	ClassDB::bind_method(D_METHOD("remove_breakpoints"), &TextEdit::remove_breakpoints);
+
+	ClassDB::bind_method(D_METHOD("draw_minimap", "draw"), &TextEdit::set_draw_minimap);
+	ClassDB::bind_method(D_METHOD("is_drawing_minimap"), &TextEdit::is_drawing_minimap);
+	ClassDB::bind_method(D_METHOD("set_minimap_width", "width"), &TextEdit::set_minimap_width);
+	ClassDB::bind_method(D_METHOD("get_minimap_width"), &TextEdit::get_minimap_width);
+
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "text", PROPERTY_HINT_MULTILINE_TEXT), "set_text", "get_text");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "readonly"), "set_readonly", "is_readonly");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "highlight_current_line"), "set_highlight_current_line", "is_highlight_current_line_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "syntax_highlighting"), "set_syntax_coloring", "is_syntax_coloring_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_line_numbers"), "set_show_line_numbers", "is_show_line_numbers_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "draw_tabs"), "set_draw_tabs", "is_drawing_tabs");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "draw_spaces"), "set_draw_spaces", "is_drawing_spaces");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bookmark_gutter"), "set_bookmark_gutter_enabled", "is_bookmark_gutter_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "breakpoint_gutter"), "set_breakpoint_gutter_enabled", "is_breakpoint_gutter_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fold_gutter"), "set_draw_fold_gutter", "is_drawing_fold_gutter");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "highlight_all_occurrences"), "set_highlight_all_occurrences", "is_highlight_all_occurrences_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_selected_font_color"), "set_override_selected_font_color", "is_overriding_selected_font_color");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "context_menu_enabled"), "set_context_menu_enabled", "is_context_menu_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shortcut_keys_enabled"), "set_shortcut_keys_enabled", "is_shortcut_keys_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "virtual_keyboard_enabled"), "set_virtual_keyboard_enabled", "is_virtual_keyboard_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "middle_mouse_paste_enabled"), "set_middle_mouse_paste_enabled", "is_middle_mouse_paste_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "selecting_enabled"), "set_selecting_enabled", "is_selecting_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "deselect_on_focus_loss_enabled"), "set_deselect_on_focus_loss_enabled", "is_deselect_on_focus_loss_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "drag_and_drop_selection_enabled"), "set_drag_and_drop_selection_enabled", "is_drag_and_drop_selection_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "smooth_scrolling"), "set_smooth_scroll_enable", "is_smooth_scroll_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "v_scroll_speed"), "set_v_scroll_speed", "get_v_scroll_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "hiding_enabled"), "set_hiding_enabled", "is_hiding_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "wrap_enabled"), "set_wrap_enabled", "is_wrap_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "scroll_vertical"), "set_v_scroll", "get_v_scroll");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "scroll_horizontal"), "set_h_scroll", "get_h_scroll");
+
+	ADD_GROUP("Minimap", "minimap_");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "minimap_draw"), "draw_minimap", "is_drawing_minimap");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "minimap_width"), "set_minimap_width", "get_minimap_width");
+
+	ADD_GROUP("Caret", "caret_");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_block_mode"), "cursor_set_block_mode", "cursor_is_block_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_blink"), "cursor_set_blink_enabled", "cursor_get_blink_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "caret_blink_speed", PROPERTY_HINT_RANGE, "0.1,10,0.01"), "cursor_set_blink_speed", "cursor_get_blink_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "caret_moving_by_right_click"), "set_right_click_moves_caret", "is_right_click_moving_caret");
+
+	ADD_SIGNAL(MethodInfo("cursor_changed"));
+	ADD_SIGNAL(MethodInfo("text_changed"));
+	ADD_SIGNAL(MethodInfo("request_completion"));
+	ADD_SIGNAL(MethodInfo("breakpoint_toggled", PropertyInfo(Variant::INT, "row")));
+	ADD_SIGNAL(MethodInfo("symbol_lookup", PropertyInfo(Variant::STRING, "symbol"), PropertyInfo(Variant::INT, "row"), PropertyInfo(Variant::INT, "column")));
+	ADD_SIGNAL(MethodInfo("info_clicked", PropertyInfo(Variant::INT, "row"), PropertyInfo(Variant::STRING, "info")));
+
+	BIND_ENUM_CONSTANT(MENU_CUT);
+	BIND_ENUM_CONSTANT(MENU_COPY);
+	BIND_ENUM_CONSTANT(MENU_PASTE);
+	BIND_ENUM_CONSTANT(MENU_CLEAR);
+	BIND_ENUM_CONSTANT(MENU_SELECT_ALL);
+	BIND_ENUM_CONSTANT(MENU_UNDO);
+	BIND_ENUM_CONSTANT(MENU_REDO);
+	BIND_ENUM_CONSTANT(MENU_MAX);
+
+	GLOBAL_DEF("gui/timers/text_edit_idle_detect_sec", 3);
+	ProjectSettings::get_singleton()->set_custom_property_info("gui/timers/text_edit_idle_detect_sec", PropertyInfo(Variant::REAL, "gui/timers/text_edit_idle_detect_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater")); // No negative numbers.
+	GLOBAL_DEF("gui/common/text_edit_undo_stack_max_size", 1024);
+	ProjectSettings::get_singleton()->set_custom_property_info("gui/common/text_edit_undo_stack_max_size", PropertyInfo(Variant::INT, "gui/common/text_edit_undo_stack_max_size", PROPERTY_HINT_RANGE, "0,10000,1,or_greater")); // No negative numbers.
+}
+
+TextEdit::TextEdit() {
+	setting_row = false;
+	draw_tabs = false;
+	draw_spaces = false;
+	override_selected_font_color = false;
+	draw_caret = true;
+	clear();
+	wrap_enabled = false;
+	wrap_at = 0;
+	wrap_right_offset = 10;
+	set_focus_mode(FOCUS_ALL);
+	syntax_highlighter = nullptr;
+	_update_caches();
+	cache.row_height = 1;
+	cache.line_spacing = 1;
+	cache.line_number_w = 1;
+	cache.breakpoint_gutter_width = 0;
+	breakpoint_gutter_width = 0;
+	cache.fold_gutter_width = 0;
+	fold_gutter_width = 0;
+	info_gutter_width = 0;
+	cache.info_gutter_width = 0;
+	set_default_cursor_shape(CURSOR_IBEAM);
+
+	indent_size = 4;
+	text.set_indent_size(indent_size);
+	text.clear();
+	text.set_color_regions(&color_regions);
+
+	h_scroll = memnew(HScrollBar);
+	v_scroll = memnew(VScrollBar);
+
+	add_child(h_scroll);
+	add_child(v_scroll);
+
+	updating_scrolls = false;
+	selection.active = false;
+
+	h_scroll->connect("value_changed", this, "_scroll_moved");
+	v_scroll->connect("value_changed", this, "_scroll_moved");
+
+	v_scroll->connect("scrolling", this, "_v_scroll_input");
+
+	cursor_changed_dirty = false;
+	text_changed_dirty = false;
+
+	selection.selecting_mode = Selection::MODE_NONE;
+	selection.selecting_line = 0;
+	selection.selecting_column = 0;
+	selection.selecting_text = false;
+	selection.active = false;
+	syntax_coloring = false;
+
+	block_caret = false;
+	caret_blink_enabled = false;
+	caret_blink_timer = memnew(Timer);
+	add_child(caret_blink_timer);
+	caret_blink_timer->set_wait_time(0.65);
+	caret_blink_timer->connect("timeout", this, "_toggle_draw_caret");
+	cursor_set_blink_enabled(false);
+	right_click_moves_caret = true;
+
+	idle_detect = memnew(Timer);
+	add_child(idle_detect);
+	idle_detect->set_one_shot(true);
+	idle_detect->set_wait_time(GLOBAL_GET("gui/timers/text_edit_idle_detect_sec"));
+	idle_detect->connect("timeout", this, "_push_current_op");
+
+	click_select_held = memnew(Timer);
+	add_child(click_select_held);
+	click_select_held->set_wait_time(0.05);
+	click_select_held->connect("timeout", this, "_click_selection_held");
+
+	current_op.type = TextOperation::TYPE_NONE;
+	undo_enabled = true;
+	undo_stack_max_size = GLOBAL_GET("gui/common/text_edit_undo_stack_max_size");
+	undo_stack_pos = nullptr;
+	setting_text = false;
+	last_dblclk = 0;
+	current_op.version = 0;
+	version = 0;
+	saved_version = 0;
+
+	completion_enabled = false;
+	completion_active = false;
+	completion_line_ofs = 0;
+	tooltip_obj_id = ObjectID();
+	line_numbers = false;
+	line_numbers_zero_padded = false;
+	line_length_guidelines = false;
+	line_length_guideline_soft_col = 80;
+	line_length_guideline_hard_col = 100;
+	draw_bookmark_gutter = false;
+	draw_breakpoint_gutter = false;
+	draw_fold_gutter = false;
+	draw_info_gutter = false;
+	hiding_enabled = false;
+	next_operation_is_complex = false;
+	scroll_past_end_of_file_enabled = false;
+	auto_brace_completion_enabled = false;
+	brace_matching_enabled = false;
+	highlight_all_occurrences = false;
+	highlight_current_line = false;
+	indent_using_spaces = false;
+	space_indent = "    ";
+	auto_indent = false;
+	insert_mode = false;
+	window_has_focus = true;
+	select_identifiers_enabled = false;
+	smooth_scroll_enabled = false;
+	scrolling = false;
+	minimap_clicked = false;
+	hovering_minimap = false;
+	dragging_minimap = false;
+	can_drag_minimap = false;
+	minimap_scroll_ratio = 0;
+	minimap_scroll_click_pos = 0;
+	dragging_selection = false;
+	target_v_scroll = 0;
+	v_scroll_speed = 80;
+	draw_minimap = false;
+	minimap_width = 80;
+	minimap_char_size = Point2(1, 2);
+	minimap_line_spacing = 1;
+
+	selecting_enabled = true;
+	deselect_on_focus_loss_enabled = true;
+	context_menu_enabled = true;
+	shortcut_keys_enabled = true;
+	middle_mouse_paste_enabled = true;
+	menu = memnew(PopupMenu);
+	add_child(menu);
+	readonly = true; // Initialise to opposite first, so we get past the early-out in set_readonly.
+	set_readonly(false);
+	menu->connect("id_pressed", this, "menu_option");
+	first_draw = true;
+
+	executing_line = -1;
+}
+
+TextEdit::~TextEdit() {
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+Map<int, TextEdit::HighlighterInfo> TextEdit::_get_line_syntax_highlighting(int p_line) {
+	if (syntax_highlighting_cache.has(p_line)) {
+		return syntax_highlighting_cache[p_line];
+	}
+
+	if (syntax_highlighter != nullptr) {
+		Map<int, HighlighterInfo> color_map = syntax_highlighter->_get_line_syntax_highlighting(p_line);
+		syntax_highlighting_cache[p_line] = color_map;
+		return color_map;
+	}
+
+	Map<int, HighlighterInfo> color_map;
+
+	bool prev_is_char = false;
+	bool prev_is_number = false;
+	bool in_keyword = false;
+	bool in_word = false;
+	bool in_function_name = false;
+	bool in_member_variable = false;
+	bool is_hex_notation = false;
+	Color keyword_color;
+	Color color;
+
+	int in_region = _is_line_in_region(p_line);
+	int deregion = 0;
+
+	const Map<int, TextEdit::Text::ColorRegionInfo> cri_map = text.get_color_region_info(p_line);
+	const String &str = text[p_line];
+	Color prev_color;
+	for (int j = 0; j < str.length(); j++) {
+		HighlighterInfo highlighter_info;
+
+		if (deregion > 0) {
+			deregion--;
+			if (deregion == 0) {
+				in_region = -1;
+			}
+		}
+
+		if (deregion != 0) {
+			if (color != prev_color) {
+				prev_color = color;
+				highlighter_info.color = color;
+				color_map[j] = highlighter_info;
+			}
+			continue;
+		}
+
+		color = cache.font_color;
+
+		bool is_char = _is_text_char(str[j]);
+		bool is_symbol = _is_symbol(str[j]);
+		bool is_number = _is_number(str[j]);
+
+		// Allow ABCDEF in hex notation.
+		if (is_hex_notation && (_is_hex_symbol(str[j]) || is_number)) {
+			is_number = true;
+		} else {
+			is_hex_notation = false;
+		}
+
+		// Check for dot or underscore or 'x' for hex notation in floating point number or 'e' for scientific notation.
+		if ((str[j] == '.' || str[j] == 'x' || str[j] == '_' || str[j] == 'f' || str[j] == 'e') && !in_word && prev_is_number && !is_number) {
+			is_number = true;
+			is_symbol = false;
+			is_char = false;
+
+			if (str[j] == 'x' && str[j - 1] == '0') {
+				is_hex_notation = true;
+			}
+		}
+
+		if (!in_word && _is_char(str[j]) && !is_number) {
+			in_word = true;
+		}
+
+		if ((in_keyword || in_word) && !is_hex_notation) {
+			is_number = false;
+		}
+
+		if (is_symbol && str[j] != '.' && in_word) {
+			in_word = false;
+		}
+
+		if (is_symbol && cri_map.has(j)) {
+			const TextEdit::Text::ColorRegionInfo &cri = cri_map[j];
+
+			if (in_region == -1) {
+				if (!cri.end) {
+					in_region = cri.region;
+				}
+			} else if (in_region == cri.region && !color_regions[cri.region].line_only) { // Ignore otherwise.
+				if (cri.end || color_regions[cri.region].eq) {
+					deregion = color_regions[cri.region].eq ? color_regions[cri.region].begin_key.length() : color_regions[cri.region].end_key.length();
+				}
+			}
+		}
+
+		if (!is_char) {
+			in_keyword = false;
+		}
+
+		if (in_region == -1 && !in_keyword && is_char && !prev_is_char) {
+			int to = j;
+			while (to < str.length() && _is_text_char(str[to])) {
+				to++;
+			}
+
+			uint32_t hash = String::hash(&str[j], to - j);
+			StrRange range(&str[j], to - j);
+
+			const Color *col = keywords.custom_getptr(range, hash);
+
+			if (!col) {
+				col = member_keywords.custom_getptr(range, hash);
+
+				if (col) {
+					for (int k = j - 1; k >= 0; k--) {
+						if (str[k] == '.') {
+							col = nullptr; // Member indexing not allowed.
+							break;
+						} else if (str[k] > 32) {
+							break;
+						}
+					}
+				}
+			}
+
+			if (col) {
+				in_keyword = true;
+				keyword_color = *col;
+			}
+		}
+
+		if (!in_function_name && in_word && !in_keyword) {
+			int k = j;
+			while (k < str.length() && !_is_symbol(str[k]) && str[k] != '\t' && str[k] != ' ') {
+				k++;
+			}
+
+			// Check for space between name and bracket.
+			while (k < str.length() && (str[k] == '\t' || str[k] == ' ')) {
+				k++;
+			}
+
+			if (str[k] == '(') {
+				in_function_name = true;
+			}
+		}
+
+		if (!in_function_name && !in_member_variable && !in_keyword && !is_number && in_word) {
+			int k = j;
+			while (k > 0 && !_is_symbol(str[k]) && str[k] != '\t' && str[k] != ' ') {
+				k--;
+			}
+
+			if (str[k] == '.') {
+				in_member_variable = true;
+			}
+		}
+
+		if (is_symbol) {
+			in_function_name = false;
+			in_member_variable = false;
+		}
+
+		if (in_region >= 0) {
+			color = color_regions[in_region].color;
+		} else if (in_keyword) {
+			color = keyword_color;
+		} else if (in_member_variable) {
+			color = cache.member_variable_color;
+		} else if (in_function_name) {
+			color = cache.function_color;
+		} else if (is_symbol) {
+			color = cache.symbol_color;
+		} else if (is_number) {
+			color = cache.number_color;
+		}
+
+		prev_is_char = is_char;
+		prev_is_number = is_number;
+
+		if (color != prev_color) {
+			prev_color = color;
+			highlighter_info.color = color;
+			color_map[j] = highlighter_info;
+		}
+	}
+
+	syntax_highlighting_cache[p_line] = color_map;
+	return color_map;
+}
+
+void SyntaxHighlighter::set_text_editor(TextEdit *p_text_editor) {
+	text_editor = p_text_editor;
+}
+
+TextEdit *SyntaxHighlighter::get_text_editor() {
+	return text_editor;
+}

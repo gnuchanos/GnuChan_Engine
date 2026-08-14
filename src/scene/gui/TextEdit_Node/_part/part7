@@ -1,0 +1,741 @@
+String TextEdit::get_selection_text() const {
+	if (!selection.active) {
+		return "";
+	}
+
+	return _base_get_text(selection.from_line, selection.from_column, selection.to_line, selection.to_column);
+}
+
+String TextEdit::get_word_under_cursor() const {
+	int prev_cc = cursor.column;
+	while (prev_cc > 0) {
+		bool is_char = _is_text_char(text[cursor.line][prev_cc - 1]);
+		if (!is_char) {
+			break;
+		}
+		--prev_cc;
+	}
+
+	int next_cc = cursor.column;
+	while (next_cc < text[cursor.line].length()) {
+		bool is_char = _is_text_char(text[cursor.line][next_cc]);
+		if (!is_char) {
+			break;
+		}
+		++next_cc;
+	}
+	if (prev_cc == cursor.column || next_cc == cursor.column) {
+		return "";
+	}
+	return text[cursor.line].substr(prev_cc, next_cc - prev_cc);
+}
+
+void TextEdit::set_search_text(const String &p_search_text) {
+	search_text = p_search_text;
+}
+
+void TextEdit::set_search_flags(uint32_t p_flags) {
+	search_flags = p_flags;
+}
+
+void TextEdit::set_current_search_result(int line, int col) {
+	search_result_line = line;
+	search_result_col = col;
+	update();
+}
+
+void TextEdit::set_highlight_all_occurrences(const bool p_enabled) {
+	highlight_all_occurrences = p_enabled;
+	update();
+}
+
+bool TextEdit::is_highlight_all_occurrences_enabled() const {
+	return highlight_all_occurrences;
+}
+
+int TextEdit::_get_column_pos_of_word(const String &p_key, const String &p_search, uint32_t p_search_flags, int p_from_column) {
+	int col = -1;
+
+	if (p_key.length() > 0 && p_search.length() > 0) {
+		if (p_from_column < 0 || p_from_column > p_search.length()) {
+			p_from_column = 0;
+		}
+
+		while (col == -1 && p_from_column <= p_search.length()) {
+			if (p_search_flags & SEARCH_MATCH_CASE) {
+				col = p_search.find(p_key, p_from_column);
+			} else {
+				col = p_search.findn(p_key, p_from_column);
+			}
+
+			// Whole words only.
+			if (col != -1 && p_search_flags & SEARCH_WHOLE_WORDS) {
+				p_from_column = col;
+
+				if (col > 0 && _is_text_char(p_search[col - 1])) {
+					col = -1;
+				} else if ((col + p_key.length()) < p_search.length() && _is_text_char(p_search[col + p_key.length()])) {
+					col = -1;
+				}
+			}
+
+			p_from_column += 1;
+		}
+	}
+	return col;
+}
+
+PoolVector<int> TextEdit::_search_bind(const String &p_key, uint32_t p_search_flags, int p_from_line, int p_from_column) const {
+	int col, line;
+	if (search(p_key, p_search_flags, p_from_line, p_from_column, line, col)) {
+		PoolVector<int> result;
+		result.resize(2);
+		result.set(SEARCH_RESULT_COLUMN, col);
+		result.set(SEARCH_RESULT_LINE, line);
+		return result;
+
+	} else {
+		return PoolVector<int>();
+	}
+}
+
+bool TextEdit::search(const String &p_key, uint32_t p_search_flags, int p_from_line, int p_from_column, int &r_line, int &r_column) const {
+	if (p_key.length() == 0) {
+		return false;
+	}
+	ERR_FAIL_INDEX_V(p_from_line, text.size(), false);
+	ERR_FAIL_INDEX_V(p_from_column, text[p_from_line].length() + 1, false);
+
+	// Search through the whole document, but start by current line.
+
+	int line = p_from_line;
+	int pos = -1;
+
+	for (int i = 0; i < text.size() + 1; i++) {
+		if (line < 0) {
+			line = text.size() - 1;
+		}
+		if (line == text.size()) {
+			line = 0;
+		}
+
+		String text_line = text[line];
+		int from_column = 0;
+		if (line == p_from_line) {
+			if (i == text.size()) {
+				// Wrapped.
+
+				if (p_search_flags & SEARCH_BACKWARDS) {
+					from_column = text_line.length();
+				} else {
+					from_column = 0;
+				}
+
+			} else {
+				from_column = p_from_column;
+			}
+
+		} else {
+			if (p_search_flags & SEARCH_BACKWARDS) {
+				from_column = text_line.length() - 1;
+			} else {
+				from_column = 0;
+			}
+		}
+
+		pos = -1;
+
+		int pos_from = (p_search_flags & SEARCH_BACKWARDS) ? text_line.length() : 0;
+		int last_pos = -1;
+
+		while (true) {
+			if (p_search_flags & SEARCH_BACKWARDS) {
+				while ((last_pos = (p_search_flags & SEARCH_MATCH_CASE) ? text_line.rfind(p_key, pos_from) : text_line.rfindn(p_key, pos_from)) != -1) {
+					if (last_pos <= from_column) {
+						pos = last_pos;
+						break;
+					}
+					pos_from = last_pos - p_key.length();
+					if (pos_from < 0) {
+						break;
+					}
+				}
+			} else {
+				while ((last_pos = (p_search_flags & SEARCH_MATCH_CASE) ? text_line.find(p_key, pos_from) : text_line.findn(p_key, pos_from)) != -1) {
+					if (last_pos >= from_column) {
+						pos = last_pos;
+						break;
+					}
+					pos_from = last_pos + p_key.length();
+				}
+			}
+
+			bool is_match = true;
+
+			if (pos != -1 && (p_search_flags & SEARCH_WHOLE_WORDS)) {
+				// Validate for whole words.
+				if (pos > 0 && _is_text_char(text_line[pos - 1])) {
+					is_match = false;
+				} else if (pos + p_key.length() < text_line.length() && _is_text_char(text_line[pos + p_key.length()])) {
+					is_match = false;
+				}
+			}
+
+			if (pos_from == -1) {
+				pos = -1;
+			}
+
+			if (is_match || last_pos == -1 || pos == -1) {
+				break;
+			}
+
+			pos_from = (p_search_flags & SEARCH_BACKWARDS) ? pos - 1 : pos + 1;
+			pos = -1;
+		}
+
+		if (pos != -1) {
+			break;
+		}
+
+		if (p_search_flags & SEARCH_BACKWARDS) {
+			line--;
+		} else {
+			line++;
+		}
+	}
+
+	if (pos == -1) {
+		r_line = -1;
+		r_column = -1;
+		return false;
+	}
+
+	r_line = line;
+	r_column = pos;
+
+	return true;
+}
+
+void TextEdit::_cursor_changed_emit() {
+	emit_signal("cursor_changed");
+	cursor_changed_dirty = false;
+}
+
+void TextEdit::_text_changed_emit() {
+	emit_signal("text_changed");
+	text_changed_dirty = false;
+}
+
+void TextEdit::set_line_as_marked(int p_line, bool p_marked) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	text.set_marked(p_line, p_marked);
+	update();
+}
+
+void TextEdit::set_line_as_safe(int p_line, bool p_safe) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	text.set_safe(p_line, p_safe);
+	update();
+}
+
+bool TextEdit::is_line_set_as_safe(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	return text.is_safe(p_line);
+}
+
+void TextEdit::set_executing_line(int p_line) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	executing_line = p_line;
+	update();
+}
+
+void TextEdit::clear_executing_line() {
+	executing_line = -1;
+	update();
+}
+
+bool TextEdit::is_line_set_as_bookmark(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	return text.is_bookmark(p_line);
+}
+
+void TextEdit::set_line_as_bookmark(int p_line, bool p_bookmark) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	text.set_bookmark(p_line, p_bookmark);
+	update();
+}
+
+void TextEdit::get_bookmarks(List<int> *p_bookmarks) const {
+	for (int i = 0; i < text.size(); i++) {
+		if (text.is_bookmark(i)) {
+			p_bookmarks->push_back(i);
+		}
+	}
+}
+
+Array TextEdit::get_bookmarks_array() const {
+	Array arr;
+	for (int i = 0; i < text.size(); i++) {
+		if (text.is_bookmark(i)) {
+			arr.append(i);
+		}
+	}
+	return arr;
+}
+
+bool TextEdit::is_line_set_as_breakpoint(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	return text.is_breakpoint(p_line);
+}
+
+void TextEdit::set_line_as_breakpoint(int p_line, bool p_breakpoint) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	text.set_breakpoint(p_line, p_breakpoint);
+	update();
+}
+
+void TextEdit::get_breakpoints(List<int> *p_breakpoints) const {
+	for (int i = 0; i < text.size(); i++) {
+		if (text.is_breakpoint(i)) {
+			p_breakpoints->push_back(i);
+		}
+	}
+}
+
+Array TextEdit::get_breakpoints_array() const {
+	Array arr;
+	for (int i = 0; i < text.size(); i++) {
+		if (text.is_breakpoint(i)) {
+			arr.append(i);
+		}
+	}
+	return arr;
+}
+
+void TextEdit::remove_breakpoints() {
+	for (int i = 0; i < text.size(); i++) {
+		if (text.is_breakpoint(i)) {
+			/* Should "breakpoint_toggled" be fired when breakpoints are removed this way? */
+			text.set_breakpoint(i, false);
+		}
+	}
+}
+
+void TextEdit::set_line_info_icon(int p_line, Ref<Texture> p_icon, String p_info) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	text.set_info_icon(p_line, p_icon, p_info);
+	update();
+}
+
+void TextEdit::clear_info_icons() {
+	text.clear_info_icons();
+	update();
+}
+
+void TextEdit::set_line_as_hidden(int p_line, bool p_hidden) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	if (is_hiding_enabled() || !p_hidden) {
+		text.set_hidden(p_line, p_hidden);
+	}
+	update();
+}
+
+bool TextEdit::is_line_hidden(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	return text.is_hidden(p_line);
+}
+
+void TextEdit::fold_all_lines() {
+	for (int i = 0; i < text.size(); i++) {
+		fold_line(i);
+	}
+	_update_scrollbars();
+	update();
+}
+
+void TextEdit::unhide_all_lines() {
+	for (int i = 0; i < text.size(); i++) {
+		text.set_hidden(i, false);
+	}
+	_update_scrollbars();
+	update();
+}
+
+int TextEdit::num_lines_from(int p_line_from, int visible_amount) const {
+	// Returns the number of lines (hidden and unhidden) from p_line_from to (p_line_from + visible_amount of unhidden lines).
+	ERR_FAIL_INDEX_V(p_line_from, text.size(), ABS(visible_amount));
+
+	if (!is_hiding_enabled()) {
+		return ABS(visible_amount);
+	}
+
+	int num_visible = 0;
+	int num_total = 0;
+	if (visible_amount >= 0) {
+		for (int i = p_line_from; i < text.size(); i++) {
+			num_total++;
+			if (!is_line_hidden(i)) {
+				num_visible++;
+			}
+			if (num_visible >= visible_amount) {
+				break;
+			}
+		}
+	} else {
+		visible_amount = ABS(visible_amount);
+		for (int i = p_line_from; i >= 0; i--) {
+			num_total++;
+			if (!is_line_hidden(i)) {
+				num_visible++;
+			}
+			if (num_visible >= visible_amount) {
+				break;
+			}
+		}
+	}
+	return num_total;
+}
+
+int TextEdit::num_lines_from_rows(int p_line_from, int p_wrap_index_from, int visible_amount, int &wrap_index) const {
+	// Returns the number of lines (hidden and unhidden) from (p_line_from + p_wrap_index_from) row to (p_line_from + visible_amount of unhidden and wrapped rows).
+	// Wrap index is set to the wrap index of the last line.
+	wrap_index = 0;
+	ERR_FAIL_INDEX_V(p_line_from, text.size(), ABS(visible_amount));
+
+	if (!is_hiding_enabled() && !is_wrap_enabled()) {
+		return ABS(visible_amount);
+	}
+
+	int num_visible = 0;
+	int num_total = 0;
+	if (visible_amount == 0) {
+		num_total = 0;
+		wrap_index = 0;
+	} else if (visible_amount > 0) {
+		int i;
+		num_visible -= p_wrap_index_from;
+		for (i = p_line_from; i < text.size(); i++) {
+			num_total++;
+			if (!is_line_hidden(i)) {
+				num_visible++;
+				num_visible += times_line_wraps(i);
+			}
+			if (num_visible >= visible_amount) {
+				break;
+			}
+		}
+		wrap_index = times_line_wraps(MIN(i, text.size() - 1)) - (num_visible - visible_amount);
+	} else {
+		visible_amount = ABS(visible_amount);
+		int i;
+		num_visible -= times_line_wraps(p_line_from) - p_wrap_index_from;
+		for (i = p_line_from; i >= 0; i--) {
+			num_total++;
+			if (!is_line_hidden(i)) {
+				num_visible++;
+				num_visible += times_line_wraps(i);
+			}
+			if (num_visible >= visible_amount) {
+				break;
+			}
+		}
+		wrap_index = (num_visible - visible_amount);
+	}
+	wrap_index = MAX(wrap_index, 0);
+	return num_total;
+}
+
+int TextEdit::get_last_unhidden_line() const {
+	// Returns the last line in the text that is not hidden.
+	if (!is_hiding_enabled()) {
+		return text.size() - 1;
+	}
+
+	int last_line;
+	for (last_line = text.size() - 1; last_line > 0; last_line--) {
+		if (!is_line_hidden(last_line)) {
+			break;
+		}
+	}
+	return last_line;
+}
+
+int TextEdit::get_indent_level(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), 0);
+
+	// Counts number of tabs and spaces before line starts.
+	int tab_count = 0;
+	int whitespace_count = 0;
+	int line_length = text[p_line].size();
+	for (int i = 0; i < line_length - 1; i++) {
+		if (text[p_line][i] == '\t') {
+			tab_count++;
+		} else if (text[p_line][i] == ' ') {
+			whitespace_count++;
+		} else {
+			break;
+		}
+	}
+	return tab_count * indent_size + whitespace_count;
+}
+
+bool TextEdit::is_line_comment(int p_line) const {
+	// Checks to see if this line is the start of a comment.
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+
+	const Map<int, Text::ColorRegionInfo> &cri_map = text.get_color_region_info(p_line);
+
+	int line_length = text[p_line].size();
+	for (int i = 0; i < line_length - 1; i++) {
+		if (_is_symbol(text[p_line][i]) && cri_map.has(i)) {
+			const Text::ColorRegionInfo &cri = cri_map[i];
+			return color_regions[cri.region].begin_key == "#" || color_regions[cri.region].begin_key == "//";
+		} else if (_is_whitespace(text[p_line][i])) {
+			continue;
+		} else {
+			break;
+		}
+	}
+	return false;
+}
+
+bool TextEdit::can_fold(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	if (!is_hiding_enabled()) {
+		return false;
+	}
+	if (p_line + 1 >= text.size()) {
+		return false;
+	}
+	if (text[p_line].strip_edges().size() == 0) {
+		return false;
+	}
+	if (is_folded(p_line)) {
+		return false;
+	}
+	if (is_line_hidden(p_line)) {
+		return false;
+	}
+	if (is_line_comment(p_line)) {
+		return false;
+	}
+
+	int start_indent = get_indent_level(p_line);
+
+	for (int i = p_line + 1; i < text.size(); i++) {
+		if (text[i].strip_edges().size() == 0) {
+			continue;
+		}
+		int next_indent = get_indent_level(i);
+		if (is_line_comment(i)) {
+			continue;
+		} else if (next_indent > start_indent) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	return false;
+}
+
+bool TextEdit::is_folded(int p_line) const {
+	ERR_FAIL_INDEX_V(p_line, text.size(), false);
+	if (p_line + 1 >= text.size()) {
+		return false;
+	}
+	return !is_line_hidden(p_line) && is_line_hidden(p_line + 1);
+}
+
+Vector<int> TextEdit::get_folded_lines() const {
+	Vector<int> folded_lines;
+
+	for (int i = 0; i < text.size(); i++) {
+		if (is_folded(i)) {
+			folded_lines.push_back(i);
+		}
+	}
+	return folded_lines;
+}
+void TextEdit::fold_line(int p_line) {
+	ERR_FAIL_INDEX(p_line, text.size());
+	if (!is_hiding_enabled()) {
+		return;
+	}
+	if (!can_fold(p_line)) {
+		return;
+	}
+
+	// Hide lines below this one.
+	int start_indent = get_indent_level(p_line);
+	int last_line = start_indent;
+	for (int i = p_line + 1; i < text.size(); i++) {
+		if (text[i].strip_edges().size() != 0) {
+			if (is_line_comment(i) && get_indent_level(i) <= start_indent) {
+				// Checked indent to make sure indented comments that finish a code block are folded.
+				continue;
+			} else if (get_indent_level(i) > start_indent) {
+				last_line = i;
+			} else {
+				break;
+			}
+		}
+	}
+	for (int i = p_line + 1; i <= last_line; i++) {
+		set_line_as_hidden(i, true);
+	}
+
+	// Fix selection.
+	if (is_selection_active()) {
+		if (is_line_hidden(selection.from_line) && is_line_hidden(selection.to_line)) {
+			deselect();
+		} else if (is_line_hidden(selection.from_line)) {
+			select(p_line, 9999, selection.to_line, selection.to_column);
+		} else if (is_line_hidden(selection.to_line)) {
+			select(selection.from_line, selection.from_column, p_line, 9999);
+		}
+	}
+
+	// Reset cursor.
+	if (is_line_hidden(cursor.line)) {
+		cursor_set_line(p_line, false, false);
+		cursor_set_column(get_line(p_line).length(), false);
+	}
+	_update_scrollbars();
+	update();
+}
+
+void TextEdit::unfold_line(int p_line) {
+	ERR_FAIL_INDEX(p_line, text.size());
+
+	if (!is_folded(p_line) && !is_line_hidden(p_line)) {
+		return;
+	}
+	int fold_start;
+	for (fold_start = p_line; fold_start > 0; fold_start--) {
+		if (is_folded(fold_start)) {
+			break;
+		}
+	}
+	fold_start = is_folded(fold_start) ? fold_start : p_line;
+
+	for (int i = fold_start + 1; i < text.size(); i++) {
+		if (is_line_hidden(i)) {
+			set_line_as_hidden(i, false);
+		} else {
+			break;
+		}
+	}
+	_update_scrollbars();
+	update();
+}
+
+void TextEdit::toggle_fold_line(int p_line) {
+	ERR_FAIL_INDEX(p_line, text.size());
+
+	if (!is_folded(p_line)) {
+		fold_line(p_line);
+	} else {
+		unfold_line(p_line);
+	}
+}
+
+int TextEdit::get_line_count() const {
+	return text.size();
+}
+
+void TextEdit::_do_text_op(const TextOperation &p_op, bool p_reverse) {
+	ERR_FAIL_COND(p_op.type == TextOperation::TYPE_NONE);
+
+	bool insert = p_op.type == TextOperation::TYPE_INSERT;
+	if (p_reverse) {
+		insert = !insert;
+	}
+
+	if (insert) {
+		int check_line;
+		int check_column;
+		_base_insert_text(p_op.from_line, p_op.from_column, p_op.text, check_line, check_column);
+		ERR_FAIL_COND(check_line != p_op.to_line); // BUG.
+		ERR_FAIL_COND(check_column != p_op.to_column); // BUG.
+	} else {
+		_base_remove_text(p_op.from_line, p_op.from_column, p_op.to_line, p_op.to_column);
+	}
+}
+
+void TextEdit::_clear_redo() {
+	if (undo_stack_pos == nullptr) {
+		return; // Nothing to clear.
+	}
+
+	_push_current_op();
+
+	while (undo_stack_pos) {
+		List<TextOperation>::Element *elem = undo_stack_pos;
+		undo_stack_pos = undo_stack_pos->next();
+		undo_stack.erase(elem);
+	}
+}
+
+bool TextEdit::has_undo() const {
+	if (undo_stack_pos == nullptr) {
+		int pending = current_op.type == TextOperation::TYPE_NONE ? 0 : 1;
+		return undo_stack.size() + pending > 0;
+	}
+	return undo_stack_pos != undo_stack.front();
+}
+
+bool TextEdit::has_redo() const {
+	return undo_stack_pos != nullptr;
+}
+
+void TextEdit::undo() {
+	_push_current_op();
+
+	if (undo_stack_pos == nullptr) {
+		if (!undo_stack.size()) {
+			return; // Nothing to undo.
+		}
+
+		undo_stack_pos = undo_stack.back();
+
+	} else if (undo_stack_pos == undo_stack.front()) {
+		return; // At the bottom of the undo stack.
+	} else {
+		undo_stack_pos = undo_stack_pos->prev();
+	}
+
+	deselect();
+
+	TextOperation op = undo_stack_pos->get();
+	_do_text_op(op, true);
+
+	current_op.version = op.prev_version;
+	if (undo_stack_pos->get().chain_backward) {
+		while (true) {
+			ERR_BREAK(!undo_stack_pos->prev());
+			undo_stack_pos = undo_stack_pos->prev();
+			op = undo_stack_pos->get();
+			_do_text_op(op, true);
+			current_op.version = op.prev_version;
+			if (undo_stack_pos->get().chain_forward) {
+				break;
+			}
+		}
+	}
+
+	if (op.type != TextOperation::TYPE_INSERT && (op.from_line != op.to_line || op.to_column != op.from_column + 1)) {
+		select(op.from_line, op.from_column, op.to_line, op.to_column);
+	}
+
+	_update_scrollbars();
+	if (undo_stack_pos->get().type == TextOperation::TYPE_REMOVE) {
+		cursor_set_line(undo_stack_pos->get().to_line, false);
+		cursor_set_column(undo_stack_pos->get().to_column);
+		_cancel_code_hint();
+	} else {
+		cursor_set_line(undo_stack_pos->get().from_line, false);
+		cursor_set_column(undo_stack_pos->get().from_column);
+	}
+	update();
+}

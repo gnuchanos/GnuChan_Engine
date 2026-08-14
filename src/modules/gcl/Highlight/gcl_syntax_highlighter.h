@@ -20,7 +20,7 @@
 
 #ifdef TOOLS_ENABLED
 
-#include "scene/gui/text_edit.h"
+#include "scene/gui/TextEdit_Node/text_edit.h"
 
 namespace gcl {
 

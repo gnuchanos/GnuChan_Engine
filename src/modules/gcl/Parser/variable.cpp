@@ -27,6 +27,31 @@ static bool is_number_keyword(const String &p_word) {
 	return false;
 }
 
+/* Bir satir fonksiyon imzasi mi? ("void Update(float delta) {") amac: imza
+   satirindaki parametreler GLOBAL degiskene donusmesin. Parametreler
+   function_params_scan ile scoped olarak onerilir. */
+static bool is_function_signature_line(const String &p_line) {
+	int paren = p_line.find("(");
+	if (paren <= 0) {
+		return false;
+	}
+	/* Parantez oncesi 'void Name' kalibini ara (bosluk/sekme birakilabilir). */
+	String head = p_line.substr(0, paren).strip_edges();
+	if (!head.begins_with("void ") && head != "void") {
+		return false;
+	}
+	int paren_close = p_line.find(")", paren);
+	if (paren_close == -1) {
+		return false;
+	}
+	/* Parantez kapandiktan sonra '{' (govde acilisi) gelmeli. */
+	String tail = p_line.substr(paren_close + 1);
+	if (!tail.strip_edges().begins_with("{")) {
+		return false;
+	}
+	return true;
+}
+
 /* Bir isim gecerli mi? harf/_ ile baslar, harf/rakam/_ devam eder. */
 static bool is_valid_identifier(const String &p_word) {
 	const int len = p_word.length();
@@ -44,6 +69,21 @@ static bool is_valid_identifier(const String &p_word) {
 		}
 	}
 	return true;
+}
+
+/* Bir metnin son kelimesini dondurur (harf/rakam/_). "float delta" -> "delta". */
+static String get_last_word(const String &p_text) {
+	int i = p_text.length();
+	while (i > 0) {
+		CharType c = p_text[i - 1];
+		bool is_word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+				(c >= '0' && c <= '9') || c == '_';
+		if (!is_word) {
+			break;
+		}
+		i--;
+	}
+	return p_text.substr(i, p_text.length() - i);
 }
 
 /* Bir kelimeden isim soyli eklerini temizler:
@@ -104,6 +144,17 @@ void variable_scan(const String &p_code, Vector<String> &r_names) {
 			continue;
 		}
 
+		/* Fonksiyon imza satirini atla: 'void Name(float delta) {' gibi.
+		   Parametreler GLOBAL degisken degildir; imlecin bulundugu
+		   fonksiyona ait parametreler function_params_scan ile onerilir. */
+		if (is_function_signature_line(line)) {
+			if (line_end == len) {
+				break;
+			}
+			line_start = line_end + 1;
+			continue;
+		}
+
 		/* Kelime kelime ayir */
 		Vector<String> words;
 		int i = 0;
@@ -128,8 +179,27 @@ void variable_scan(const String &p_code, Vector<String> &r_names) {
 		   "long long int X" / "unsigned long int X" / "unsigned long long X"
 		   ve "unsigned short|int|long X", "long long X", "long double X". */
 		const int wc = words.size();
+
+		/* Satirda DUZ atama ("=") var mi? "NODE x = ...", "FATHER y = ..."
+		   gibi kullanici tanimli tipleri guvenle yakalamak icin sart.
+		   "self.Raycast.X == deger" satirlarinda "==" bulunur, bu sart
+		   false olur ve yanlis değişken yakalanmaz. */
+		bool has_plain_assign = line.find("=") != -1 &&
+				line.find("==") == -1 && line.find("!=") == -1;
+
 		for (int k = 0; k < wc; k++) {
 			bool is_type = false;
+
+			/* Kullanici tanimli tip: NODE, struct/class/typedef isimleri
+			   buyuk harfle baslar. Sadece "Tip Degisken = ..." kalibinda
+			   yakala; "self.Raycast.GetBodyName" gibi member zinciri bu
+			   satirlarda "==" oldugu icin elenir. */
+			if (has_plain_assign && k + 1 < wc &&
+					words[k].length() > 0 && words[k][0] >= 'A' && words[k][0] <= 'Z' &&
+					is_valid_identifier(words[k + 1])) {
+				r_names.push_back(words[k + 1]);
+				is_type = true;
+			}
 
 			/* 3 kelimeli: "unsigned long int X" */
 			if (words[k] == "unsigned" && k + 3 < wc && words[k + 1] == "long" &&
@@ -187,9 +257,15 @@ void variable_scan(const String &p_code, Vector<String> &r_names) {
 				if (k + 1 < wc && is_number_keyword(words[k + 1])) {
 					continue;
 				}
-				String cleaned = clean_identifier(words[k + 1]);
-				if (k + 1 < wc && is_valid_identifier(cleaned)) {
-					r_names.push_back(cleaned);
+				/* Satirin SON kelimesi tip kelimesi olabilir ("self.Raycast"
+				   gibi bir dizi tip adiyla biten satirlar); words[k + 1]'e
+				   sinir kontrolu OLMADAN erismek CowData get() crash'ine
+				   (out of bounds) yol aciyordu. */
+				if (k + 1 < wc) {
+					String cleaned = clean_identifier(words[k + 1]);
+					if (is_valid_identifier(cleaned)) {
+						r_names.push_back(cleaned);
+					}
 				}
 			}
 		}
@@ -198,6 +274,86 @@ void variable_scan(const String &p_code, Vector<String> &r_names) {
 			break;
 		}
 		line_start = line_end + 1;
+	}
+}
+
+/* Imlecin (p_offset) icinde bulundugu fonksiyonun parametre adlarini toplar.
+   Sondan geriye dogru ilk "void Name(...) {" imzasi bulunur: kullanici en
+   son acilan fonksiyonun govdesinde yaziyordur. Boylece Update ve
+   UpdatePhysics ayni anda delta icerdiginde bile yalnizca GECERLI fonksiyonun
+   parametresi onerilir - delta asla 2+ kere cikmaz. */
+void function_params_scan(const String &p_code, int p_offset, Vector<String> &r_names) {
+	r_names.clear();
+
+	if (p_code.empty() || p_offset < 0) {
+		return;
+	}
+	if (p_offset > p_code.length()) {
+		p_offset = p_code.length();
+	}
+
+	/* p_offset oncesindeki her imza satirini bul; en sonda kalan sonuncudur. */
+	String prefix = p_code.substr(0, p_offset);
+
+	int found_start = -1;
+	int found_end = -1;
+
+	int s = 0;
+	const int len = prefix.length();
+	while (s <= len) {
+		int e = prefix.find("\n", s);
+		if (e == -1) {
+			e = len;
+		}
+
+		String line = prefix.substr(s, e - s).strip_edges();
+		if (is_function_signature_line(line)) {
+			found_start = s;
+			found_end = e;
+		}
+
+		if (e == len) {
+			break;
+		}
+		s = e + 1;
+	}
+
+	if (found_start == -1) {
+		return; /* imlecin ustunde hic fonksiyon imzasi yok (global scope) */
+	}
+
+	String sig = prefix.substr(found_start, found_end - found_start).strip_edges();
+
+	/* Parantez icini ayir: "void Update(float delta)" -> "float delta" */
+	int open = sig.find("(");
+	if (open == -1) {
+		return;
+	}
+	int close = sig.find(")", open);
+	if (close == -1) {
+		close = sig.length();
+	}
+	String inside = sig.substr(open + 1, close - open - 1).strip_edges();
+	if (inside.empty()) {
+		return; /* parametresiz fonksiyon */
+	}
+
+	/* Virgulle ayir, son kelime her parametrenin adidir.
+	   "float delta" -> delta; "int x, float y" -> x, y. */
+	int part_start = 0;
+	const int ilen = inside.length();
+	for (int i = 0; i <= ilen; i++) {
+		if (i == ilen || inside[i] == ',') {
+			String part = inside.substr(part_start, i - part_start).strip_edges();
+			part_start = i + 1;
+			if (part.empty()) {
+				continue;
+			}
+			String name = get_last_word(part);
+			if (is_valid_identifier(name)) {
+				r_names.push_back(name);
+			}
+		}
 	}
 }
 
