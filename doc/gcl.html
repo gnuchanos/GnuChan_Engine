@@ -264,10 +264,13 @@
   <a href="#node-turleri">Node Türleri</a>
   <a href="#material">Material</a>
   <a href="#hazir">Hazır Fonksiyonlar</a>
+  <a href="#time-sleep">Time.Sleep</a>
+  <a href="#scope">Fonksiyon Kapsamı</a>
+  <a href="#degisiklikler">Son Değişiklikler</a>
 
   <div class="foot">
     LICENSE: <b>Zlib</b><br>
-    Kaynak: <code>gcl.md</code> · <code>gcl_language.md</code>
+    Kaynak: <code>doc/gcl.md</code> · <code>doc/gcl_language.md</code>
   </div>
 </nav>
 
@@ -883,6 +886,80 @@
   <h3>Tam Yol Node Erişimi</h3>
 <pre><code>$<span class="s">"FPSController/head/Camera/RayCast"</span>   <span class="c"># full path node</span>
 $<span class="s">""</span>.members</code></pre>
+</section>
+
+<!-- ================= TIME.SLEEP ================= -->
+<section id="time-sleep">
+  <h2>Time.Sleep — Lokal Non-Blocking Uyku</h2>
+
+  <p><code>Time.Sleep(0.5)</code> <b>lokaldir</b>: yalnızca içinde bulunduğu fonksiyonun
+  <b>kalan satırlarını</b> bekletir. <code>Update</code> / <code>UpdatePhysics</code> gövdesi
+  beklerken <b>her kare çalışmaya devam eder</b> — raycast, dönme, hareket, spawn durmaz.</p>
+
+  <div class="box info">
+    <span class="title">Kurallar</span>
+    <p>Non-blocking: <code>OS::delay_usec</code> kullanılmaz → motor hiçbir zaman donmaz.</p>
+    <p>Aynı <code>Sleep</code> satırı her kare yeniden tetiklense bile süre kaydırılmaz; ertelenen satırlar süre dolunca <b>bir kez</b> çalıştırılır.</p>
+    <p>Ertelenen fonksiyonun parametre/yerel değerleri süre boyunca saklanır.</p>
+  </div>
+
+<pre><code><span class="k">void</span> <span class="f">UpdateBody</span>(<span class="t">gcChar</span> <span class="v">BodyName</span>, <span class="t">Node</span> <span class="v">Body</span>) {
+    <span class="v">Time</span>.<span class="f">Sleep</span>(<span class="n">0.5</span>);              <span class="c"># sadece bu fonksiyonun kalan satirlari bekler</span>
+    <span class="f">PrintF</span>(<span class="s">"Body Name: %s \n"</span>, <span class="v">BodyName</span>);
+    <span class="f">PrintF</span>(<span class="s">"Body Rotation.y %f \n"</span>, <span class="v">Body</span>.Rotation.y);
+}
+
+<span class="t">int</span> <span class="v">frame</span> = <span class="n">0</span>;
+<span class="k">void</span> <span class="f">Update</span>(<span class="t">float</span> <span class="v">delta</span>) {
+    <span class="v">frame</span>++;
+    <span class="f">PrintF</span>(<span class="s">"Tick %d \n"</span>, <span class="v">frame</span>);   <span class="c"># her frame basilmaya devam eder</span>
+    <span class="f">UpdateBody</span>();                  <span class="c"># icindeki Sleep(0.5) sadece UpdateBody'nin kalanlarini erteler</span>
+}</code></pre>
+</section>
+
+<!-- ================= SCOPE ================= -->
+<section id="scope">
+  <h2>Fonksiyon Kapsamı (Scope)</h2>
+
+  <p>Fonksiyon gövdesi <b>çağıranın kapsamında</b> çalışır (C semantiği):</p>
+
+  <div class="box info">
+    <span class="title">Kurallar</span>
+    <p>Global değişkenler, <code>self</code> ve <code>delta</code> fonksiyon içinde görünür.</p>
+    <p>Fonksiyonun yazdığı global değişiklikler geriye yansır.</p>
+    <p>Parametreler <b>yereldir</b>: gövde bittiğinde çağırandaki aynı isimli değişkenler eski değerlerine döner.</p>
+  </div>
+
+<pre><code><span class="k">void</span> <span class="f">UpdateBody</span>(<span class="t">gcChar</span> <span class="v">BodyName</span>, <span class="t">Node</span> <span class="v">Body</span>) {
+    <span class="v">Body</span>.Rotation.y += <span class="n">5</span> * <span class="v">delta</span>;   <span class="c"># delta gorunur (cagiran Update'in parametresi)</span>
+}
+
+<span class="k">void</span> <span class="f">Update</span>(<span class="t">float</span> <span class="v">delta</span>) {
+    <span class="t">Node</span> <span class="v">Body</span> = <span class="v">self</span>.Raycast.GetNode;
+    <span class="f">UpdateBody</span>(<span class="s">"cube"</span>, <span class="v">Body</span>);      <span class="c"># func icinde delta/self/global erisimi acik</span>
+}</code></pre>
+</section>
+
+<!-- ================= DEGISIKLIKLER ================= -->
+<section id="degisiklikler">
+  <h2>Son Değişiklikler</h2>
+
+  <h3>Time.Sleep lokal non-blocking</h3>
+  <p><code>Time.Sleep</code> yalnızca bulunduğu fonksiyonun kalan satırlarını erteler;
+  <code>Update</code>/<code>UpdatePhysics</code> gövdesi bekleme sırasında da çalışır.
+  Aynı satırın her kare yeniden tetiklenmesi süreyi kaydırmaz.</p>
+
+  <h3>Fonksiyon kapsamı (scope) düzeltmesi</h3>
+  <p>Kullanıcı fonksiyonları artık çağıranın kapsamında çalışır: <code>delta</code>, <code>self</code>
+  ve global değişkenler fonksiyon içinde görünür; parametreler yerel kalır.</p>
+
+  <h3>Karşılaştırma onarımı</h3>
+  <p><code><=</code> ve <code>>=</code> artık doğru çalışır (önceden RHS'de
+  <code>= deger</code> kalıyor, <code>while (i <= n)</code> gibi koşullar yanlış sonuç veriyordu).</p>
+
+  <h3>switch/case içinde obje üye ataması</h3>
+  <p><code>Body.Rotation.y = 5</code> gibi atamalar <code>switch</code>/<code>case</code>
+  gövdelerinde artık sessizce yutulmuyor.</p>
 </section>
 
 </main>

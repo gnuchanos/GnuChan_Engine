@@ -40,8 +40,12 @@ inline Vector<String> parse_func_params(const String &p_params) {
 
 /* "foo(a, b)" kullanici fonksiyonu cagrisini isler.
    p_types.source icinde "<tip> foo(...)" tanimini bulur, parametreleri
-   yeni scope'a baglar, gövdeyi calistirir. Donus degeri r_retval'a yazilir
-   (fonksiyon return ile biterse). Basarisizsa false dondurur. */
+   cagiranin scope'una baglar, gövdeyi calistirir. Donus degeri r_retval'a
+   yazilir (fonksiyon return ile biterse). Basarisizsa false dondurur.
+   Kapsam SEMANTIGI (C gibi): fonksiyon govdesi cagiran icin scope'unda
+   calisir -> global degiskenler, self ve delta calistirilan fonksiyonda
+   gorunur; calistiranin yazdigi globaller geriye yansir. Parametreler ise
+   YERELDIR: govde bittiginde cagirandaki eski degerleri geri yuklenir. */
 inline bool resolve_user_call(const String &p_line, Map<StringName, Variant> &p_members, GCLTypeRegistry &p_types, Variant *r_retval = nullptr) {
 	String s = p_line.strip_edges().replace(";", "").strip_edges();
 	if (s.empty() || s.begins_with("PrintF") || s.begins_with("print") ||
@@ -137,15 +141,12 @@ inline bool resolve_user_call(const String &p_line, Map<StringName, Variant> &p_
 	}
 	Vector<String> param_names = parse_func_params(sig_region);
 
-	/* yeni scope: parametre bagla */
-	Map<StringName, Variant> call_scope;
-	for (int k = 0; k < param_names.size(); k++) {
-		Variant v;
-		if (k < arg_strings.size()) {
-			String arg = arg_strings[k].strip_edges();
-			v = executor_core::initialize_value(arg, p_members);
-		}
-		call_scope[StringName(param_names[k])] = v;
+	/* Parametre degerlerini cagiranin scope'unda coz (global degiskenler
+	   ve self/self.Raycast gibi zincirler gorunur olmali). */
+	Vector<Variant> arg_values;
+	for (int k = 0; k < arg_strings.size(); k++) {
+		String arg = arg_strings[k].strip_edges();
+		arg_values.push_back(executor_core::initialize_value(arg, p_members));
 	}
 
 	/* govdeyi kapsamli kopyala */
@@ -170,11 +171,47 @@ inline bool resolve_user_call(const String &p_line, Map<StringName, Variant> &p_
 		return false;
 	}
 
+	/* Calistirilan fonksiyonun eski parametre degerlerini sakla (parametreler
+	   YERELDIR; cagiranin ayni isimdeki degiskeni ezilmemeli). */
+	Vector<StringName> shadowed;
+	Vector<Variant> old_values;
+	for (int k = 0; k < param_names.size(); k++) {
+		StringName pn = StringName(param_names[k]);
+		if (p_members.has(pn)) {
+			shadowed.push_back(pn);
+			old_values.push_back(p_members[pn]);
+		}
+		p_members[pn] = (k < arg_values.size()) ? arg_values[k] : Variant();
+	}
+
+	/* GOVDE calistiranin scope'unda calisir: global degiskenler, self ve
+	   delta fonksiyon icinde gorunur; fonksiyonun yazdigi global degisiklikler
+	   geriye yansir (C semantigi). */
 	p_types.call_depth++;
 	int exit_code = 0;
 	Variant retv;
-	executor_run_ex(body, call_scope, p_types, exit_code, &retv);
+	executor_run_ex(body, p_members, p_types, exit_code, &retv);
 	p_types.call_depth--;
+
+	/* Parametreleri geri yukle: cagiranda var olan parametre adlari eski
+	   degerine doner; cagiranda olmayan (yeni tanimlanan)lar scope'u
+	   kirletmemesi icin silinir. */
+	for (int si = 0; si < shadowed.size(); si++) {
+		p_members[shadowed[si]] = old_values[si];
+	}
+	for (int k = 0; k < param_names.size(); k++) {
+		StringName pn = StringName(param_names[k]);
+		bool was_shadowed = false;
+		for (int si = 0; si < shadowed.size(); si++) {
+			if (shadowed[si] == pn) {
+				was_shadowed = true;
+				break;
+			}
+		}
+		if (!was_shadowed) {
+			p_members.erase(pn);
+		}
+	}
 
 	if (r_retval && exit_code == 3) {
 		*r_retval = retv;
@@ -752,6 +789,10 @@ inline int run_switch(const String &p_body, int &r_pos, const String &p_stmt,
 					String rhs = single.substr(eq + 1).replace(";", "").strip_edges();
 					if (p_members.has(StringName(lhs))) {
 						p_members[StringName(lhs)] = solve_arith(rhs, p_members);
+					} else if (lhs.find(".") != -1) {
+						/* Obje member atamasi: "Body.Rotation.y = 5" case
+						   govdesinde sessizce yutuluyordu. */
+						executor_core::set_member_value(lhs, solve_arith(rhs, p_members), p_members);
 					}
 				} else if (single.begins_with("PrintF") || single.begins_with("print")) {
 					executor_core::handle_call_ex(single, p_members);

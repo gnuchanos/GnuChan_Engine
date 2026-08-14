@@ -215,6 +215,10 @@ inline bool find_best_op(const String &p_s, int &r_pos, CharType &r_op) {
 		} else if (c == ')') {
 			depth--;
 		} else if (depth == 0 && i > 0 && (c == '<' || c == '>')) {
+			if (c == '<' && i + 1 < L && p_s[i + 1] == '<') {
+				/* shift operatoru: kendi dongusunde ele alinir, burada atla */
+				continue;
+			}
 			r_pos = i;
 			r_op = c;
 			return true;
@@ -382,7 +386,9 @@ inline Variant solve_arith(const String &p_rhs, const Map<StringName, Variant> &
 		String lhs_s = r.substr(0, op_pos).strip_edges();
 		bool is_shift = (op == '<' && op_pos + 1 < r.length() && r[op_pos + 1] == '<') ||
 				(op == '>' && op_pos + 1 < r.length() && r[op_pos + 1] == '>');
-		String rhs_s = is_shift ? r.substr(op_pos + 2).strip_edges() : r.substr(op_pos + 1).strip_edges();
+		bool is_inclusive = (op == '<' || op == '>') && op_pos + 1 < r.length() && r[op_pos + 1] == '=';
+		/* "<=" / ">=" : RHS'teki '=' de tüketilir (yoksa "= n" kalir). */
+		String rhs_s = (is_shift || is_inclusive) ? r.substr(op_pos + 2).strip_edges() : r.substr(op_pos + 1).strip_edges();
 
 		Variant lhs = solve_arith(lhs_s, p_members);
 		Variant rhs = solve_arith(rhs_s, p_members);
@@ -400,10 +406,10 @@ inline Variant solve_arith(const String &p_rhs, const Map<StringName, Variant> &
 			return Variant(variant_str(lhs) != variant_str(rhs));
 		}
 		if (op == '<' && !is_shift) {
-			return Variant(variant_real(lhs) < variant_real(rhs));
+			return Variant(is_inclusive ? (variant_real(lhs) <= variant_real(rhs)) : (variant_real(lhs) < variant_real(rhs)));
 		}
 		if (op == '>' && !is_shift) {
-			return Variant(variant_real(lhs) > variant_real(rhs));
+			return Variant(is_inclusive ? (variant_real(lhs) >= variant_real(rhs)) : (variant_real(lhs) > variant_real(rhs)));
 		}
 		if (op == '<') {
 			return Variant((double)((int64_t)variant_real(lhs) << (int64_t)variant_real(rhs)));
