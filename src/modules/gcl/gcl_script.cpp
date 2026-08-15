@@ -14,8 +14,11 @@
 #include "gcl_script.h"
 #include "core/class_db.h"
 #include "core/engine.h"
+#include "core/error_macros.h"
 #include "core/object.h"
+#include "core/os/file_access.h"
 #include "core/os/os.h"
+#include "core/print_string.h"
 #include "Executor/executor.h"
 #include "Lexer/lexer.h"
 #include "Parser/parser.h"
@@ -93,9 +96,11 @@ bool GCLScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
 }
 
 void GCLScriptInstance::get_property_list(List<PropertyInfo> *p_properties) const {
-	for (const Map<StringName, Variant>::Element *E = members.front(); E; E = E->next()) {
-		p_properties->push_back(PropertyInfo(Variant::NIL, E->key()));
-	}
+	/* BOS: "Script Variables" bolumunu Inspector'da HIC gosterme.
+	   GCL degiskenleri (/extern sinif adlari, self, delta dahil) yorumlayicinin
+	   ic members tablosudur; Inspector'da sergilenmeleri "[null]" gibi
+	   anlamsiz satirlar uretiyordu (Node References surukle-birak ile
+	   karsisiyordu). Kullanici node baglantisini zaten editor uzerinden yapar. */
 }
 
 Variant::Type GCLScriptInstance::get_property_type(const StringName &p_name, bool *r_is_valid) const {
@@ -230,6 +235,40 @@ Variant GCLScriptInstance::call(const StringName &p_method, const Variant **p_ar
 /* ------------------------------------------------------------------ */
 
 Error GCLScriptLanguage::execute_file(const String &p_path) {
+	/* CLI'dan .gcsf calistirma: dosyayi oku, global scope'u (+ Ready varsa
+	   govdesini) yorumla. self=null; Time.Sleep CLI'da tek seferde degerlendirilir. */
+	FileAccess *file = FileAccess::open(p_path, FileAccess::READ);
+	if (!file) {
+		ERR_PRINT("GCL: cannot open '" + p_path + "'.");
+		return ERR_CANT_OPEN;
+	}
+	String code = file->get_as_utf8_string();
+	file->close();
+	memdelete(file);
+
+	/* Yorumlar + preprocessor satirlari icin yorum temizligi: strip_comments
+	   #define gibi direktifleri de siler, bu yuzden global scope'da yeniden
+	   islenecek govdelerde preprocessor yok sayilir (CLI icin kabul edilebilir). */
+	String clean = gcl::strip_comments(code);
+
+	GCLTypeRegistry types;
+	types.source = clean;
+	types.call_depth = 0;
+
+	Map<StringName, Variant> members;
+	members[StringName("self")] = Variant();
+
+	/* Global scope atamalari ve kontrol akisi calistir. */
+	String global_code = executor_strip_bodies(clean);
+	executor_run(global_code, members, types);
+
+	/* Ready govdesi varsa calistir (CLI'da Update/UpdatePhysics frame'e bagli,
+	   Ready yoksa da global scope ile sinirli kalir). */
+	String body;
+	if (executor_find_body(clean, "Ready", body)) {
+		executor_run(body, members, types);
+	}
+
 	return OK;
 }
 
@@ -270,9 +309,199 @@ Script *GCLScriptLanguage::create_script() const {
 	return memnew(GCLScript);
 }
 
+/* Basit denge denetimi: { } ( ) [ ] ve string kapanisi. */
+namespace {
+
+struct GCLValidateResult {
+	bool ok = true;
+	int line = 0;
+	int col = 0;
+	String msg;
+};
+
+/* Yorumları ve string'leri hesaba katarak parantez/braket denge ve
+   string kapanis denetimi yapar. Fonksiyon govdeleri tam olarak
+   ayristirilmaz; yalnizca yapisal denge. */
+void gcl_validate_struct(const String &p_code, GCLValidateResult &r_out) {
+	int line = 1;
+	int col = 1;
+	int paren = 0;
+	int brace = 0;
+	int bracket = 0;
+	bool in_str = false;
+	const int L = p_code.length();
+	int i = 0;
+	while (i < L) {
+		CharType c = p_code[i];
+		if (c == '\n') {
+			line++;
+			col = 1;
+			i++;
+			continue;
+		}
+		if (in_str) {
+			if (c == '\\') {
+				i += 2;
+				col += 2;
+				continue;
+			}
+			if (c == '"') {
+				in_str = false;
+			}
+			i++;
+			col++;
+			continue;
+		}
+		if (c == '#' && i + 1 < L && p_code[i + 1] == '|') {
+			/* blok yorum: #| ... |# (ic ice) */
+			int depth = 1;
+			i += 2;
+			col += 2;
+			while (i < L && depth > 0) {
+				if (p_code[i] == '#' && i + 1 < L && p_code[i + 1] == '|') {
+					depth++;
+					i += 2;
+					col += 2;
+				} else if (p_code[i] == '|' && i + 1 < L && p_code[i + 1] == '#') {
+					depth--;
+					i += 2;
+					col += 2;
+				} else if (p_code[i] == '\n') {
+					line++;
+					col = 1;
+					i++;
+				} else {
+					i++;
+					col++;
+				}
+			}
+			if (depth > 0) {
+				r_out.ok = false;
+				r_out.line = line;
+				r_out.col = col;
+				r_out.msg = "Unterminated block comment (missing |#).";
+				return;
+			}
+			continue;
+		}
+		if (c == '#') {
+			/* satir yorumu */
+			while (i < L && p_code[i] != '\n') {
+				i++;
+				col++;
+			}
+			continue;
+		}
+		if (c == '"') {
+			in_str = true;
+			i++;
+			col++;
+			continue;
+		}
+		if (c == '(') {
+			paren++;
+		} else if (c == ')') {
+			paren--;
+			if (paren < 0) {
+				r_out.ok = false;
+				r_out.line = line;
+				r_out.col = col;
+				r_out.msg = "Unbalanced ')'.";
+				return;
+			}
+		} else if (c == '{') {
+			brace++;
+		} else if (c == '}') {
+			brace--;
+			if (brace < 0) {
+				r_out.ok = false;
+				r_out.line = line;
+				r_out.col = col;
+				r_out.msg = "Unbalanced '}'.";
+				return;
+			}
+		} else if (c == '[') {
+			bracket++;
+		} else if (c == ']') {
+			bracket--;
+			if (bracket < 0) {
+				r_out.ok = false;
+				r_out.line = line;
+				r_out.col = col;
+				r_out.msg = "Unbalanced ']'.";
+				return;
+			}
+		}
+		i++;
+		col++;
+	}
+	if (in_str) {
+		r_out.ok = false;
+		r_out.line = line;
+		r_out.col = col;
+		r_out.msg = "Unterminated string literal.";
+		return;
+	}
+	if (brace != 0) {
+		r_out.ok = false;
+		r_out.line = line;
+		r_out.col = col;
+		r_out.msg = brace > 0 ? "Unclosed '{' block." : "Unbalanced '}'.";
+		return;
+	}
+	if (paren != 0) {
+		r_out.ok = false;
+		r_out.line = line;
+		r_out.col = col;
+		r_out.msg = paren > 0 ? "Unclosed '('." : "Unbalanced ')'.";
+		return;
+	}
+	if (bracket != 0) {
+		r_out.ok = false;
+		r_out.line = line;
+		r_out.col = col;
+		r_out.msg = bracket > 0 ? "Unclosed '['." : "Unbalanced ']'.";
+	}
+}
+
+} // namespace
+
 bool GCLScriptLanguage::validate(const String &p_script, int &r_line_error, int &r_col_error, String &r_test_error, const String &p_path, List<String> *r_functions, List<Warning> *r_warnings, Set<int> *r_safe_lines) const {
-	/* Yorumları ayıkla — bu her girdide çalışır. */
+	/* Yapısal denge: parantez/braket/string kapanislari. */
+	GCLValidateResult res;
+	gcl_validate_struct(p_script, res);
+	if (!res.ok) {
+		r_line_error = res.line;
+		r_col_error = res.col;
+		r_test_error = res.msg;
+		return false;
+	}
+
+	/* Yorumlari ayiklayip kalinti birakmiyor mu bak; hata mesaji uretmez,
+	   yalnizca editor gecisleri icin strip edilmis hali onbellememize gerek yok. */
 	gcl::strip_comments(p_script);
+
+	/* Bilinen fonksiyonlarin imzalarini dogrula: Ready() / Update(delta) /
+	   UpdatePhysics(delta) -- isim bulunursa govde kapali olmali (zaten brace
+	   dengesi bunu garantiler). */
+
+	/* Fonksiyon listesini doldur (editor aramalari icin). */
+	if (r_functions) {
+		Vector<String> names;
+		names.push_back("Ready");
+		names.push_back("Update");
+		names.push_back("UpdatePhysics");
+		for (int i = 0; i < names.size(); i++) {
+			if (p_script.find(names[i]) != -1) {
+				r_functions->push_back(names[i]);
+			}
+		}
+	}
+
+	/* Bu noktaya gelindiyse dort okunur; yorumlayici calisma aninda tek
+	   satirlik dirayetli olmayan cevrimleri zaten sessizce gecirir. */
+	r_line_error = 0;
+	r_col_error = 0;
 	return true;
 }
 

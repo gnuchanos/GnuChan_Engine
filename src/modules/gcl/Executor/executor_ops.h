@@ -215,8 +215,13 @@ inline bool find_best_op(const String &p_s, int &r_pos, CharType &r_op) {
 		} else if (c == ')') {
 			depth--;
 		} else if (depth == 0 && i > 0 && (c == '<' || c == '>')) {
-			if (c == '<' && i + 1 < L && p_s[i + 1] == '<') {
-				/* shift operatoru: kendi dongusunde ele alinir, burada atla */
+			if ((c == '<' && i + 1 < L && p_s[i + 1] == '<') ||
+					(c == '>' && i + 1 < L && p_s[i + 1] == '>')) {
+				/* Shift operatoru (<< / >>): kendi dongusunde ele alinir.
+				   IKINCI karakteri de atla - yoksa "1 << 4" ifadesinde
+				   ikinci '<' karistirma operatoru sanilir ve 16 yerine
+				   "1 < (4)" calisip sonuc 1 doner. */
+				i++;
 				continue;
 			}
 			r_pos = i;

@@ -17,6 +17,7 @@
 #include "executor.h"
 #include "executor_flow.h"
 #include "executor_class.h"
+#include "executor_dll.h"
 
 namespace gcl {
 
@@ -24,6 +25,7 @@ namespace {
 using namespace executor_core;
 using namespace executor_flow;
 using namespace executor_class;
+using namespace executor_dll;
 } // namespace
 
 void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, GCLTypeRegistry &p_types, int &r_exit, Variant *p_retval) {
@@ -50,6 +52,17 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 			   yorumu sanip temizler ve "#define X" bos stringe donusur.
 			   Dogrudan handle_preprocess'e ver. */
 			String hash_line = raw.substr(first_nonspace).strip_edges();
+
+			/* "#register "Ad", "path.dll"" -> DLL/SO ac + sembol kaydet. */
+			if (hash_line.begins_with("#register ")) {
+				handle_dll_register(hash_line, p_types);
+				line_start = line_end + 1;
+				if (line_end == len) {
+					break;
+				}
+				continue;
+			}
+
 			if (handle_preprocess(hash_line, p_members, p_types, region_active)) {
 				line_start = line_end + 1;
 				if (line_end == len) {
@@ -265,7 +278,12 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 							if (!inner.empty() && inner[inner.length() - 1] == '}') {
 								inner = inner.substr(0, inner.length() - 1);
 							}
-							if (type == "dict" || inner.find(":") != -1) {
+							/* char / gcChar dizisi: {'a', 'b', 'c'} -> "abc".
+							   %s ile basilabilir; once "a, 'b', 'c'" kalintisi
+							   caliyordu. */
+							if (type == "char" || type == "gcChar") {
+								value = parse_char_array_literal(inner, p_members);
+							} else if (type == "dict" || inner.find(":") != -1) {
 								value = parse_dict_literal(inner, p_members);
 							} else if (type != "dict" && (type == "struct" || p_types.types.has(StringName(type)) || inner.find("=") != -1)) {
 								value = parse_struct_literal(inner, p_members);
@@ -297,9 +315,16 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 							}
 							value = make_class_instance(cname, cargs, p_members, p_types);
 						} else {
-							/* RHS fonksiyon cagrisi veya aritmetik/bitwise/ternary olabilir. */
+							/* RHS fonksiyon cagrisi veya aritmetik/bitwise/ternary olabilir.
+							   handle_dll_call: "#register" ile kayitli DLL fonksiyonlari.
+							   handle_chain_call: GetNode("...") / load("...") / preload("...")
+							   ve NODE zincirleri (REF.GetChild.Find("x")) deger dondurur. */
 							Variant call_ret;
-							if (resolve_user_call(rhs, p_members, p_types, &call_ret)) {
+							if (handle_dll_call(rhs, p_members, p_types, &call_ret)) {
+								value = call_ret;
+							} else if (handle_chain_call(rhs, p_members, &call_ret)) {
+								value = call_ret;
+							} else if (resolve_user_call(rhs, p_members, p_types, &call_ret)) {
 								value = call_ret;
 							} else if (resolve_class_call(rhs, p_members, p_types, &call_ret)) {
 								value = call_ret;
@@ -323,9 +348,11 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 						}
 					}
 				} else if (p_members.has(StringName(lhs.strip_edges()))) {
-					/* duz atama: "x = ifade" (aritmetik / fonksiyon / class dahil) */
+					/* duz atama: "x = ifade" (aritmetik / fonksiyon / class / DLL dahil) */
 					Variant rvalue;
-					if (resolve_user_call(rhs, p_members, p_types, &rvalue)) {
+					if (handle_dll_call(rhs, p_members, p_types, &rvalue)) {
+						p_members[StringName(lhs.strip_edges())] = rvalue;
+					} else if (resolve_user_call(rhs, p_members, p_types, &rvalue)) {
 						p_members[StringName(lhs.strip_edges())] = rvalue;
 					} else if (resolve_class_call(rhs, p_members, p_types, &rvalue)) {
 						p_members[StringName(lhs.strip_edges())] = rvalue;
@@ -368,7 +395,14 @@ void executor_run_ex(const String &p_body, Map<StringName, Variant> &p_members, 
 				   takilip "Body Name: FPSController" spam'i basiyordu. */
 				if (!handle_call_full(stmt, p_members, p_types)) {
 					if (!resolve_class_call(stmt, p_members, p_types, nullptr)) {
-						resolve_user_call(stmt, p_members, p_types, nullptr);
+						/* NODE zincir cagrilari: REF.GetChild.Find("ali").Hide
+						   gibi yalnizca noktali zincirler. */
+						if (!handle_chain_call(stmt, p_members)) {
+							/* DLL fonksiyon cagrisi: "MesajVer("merhaba")" */
+							if (!handle_dll_call(stmt, p_members, p_types)) {
+								resolve_user_call(stmt, p_members, p_types, nullptr);
+							}
+						}
 					}
 				}
 			}

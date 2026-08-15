@@ -66,10 +66,21 @@ void comment_tokenize(const String &p_source, Vector<Token> &r_tokens) {
 			continue;
 		}
 
-		/* Satir yorumu: # ... (satir sonuna kadar) */
+		/* Satir yorumu: # ... (satir sonuna kadar)
+		   ISTISNA: #extern "dll" / #register / #include direktifleri yorum
+		   DEGILDIR; strip_comments onlari silmemeli. (executor/loader bunlari
+		   yorum temizlemeden once cozer.) */
 		if (c == '#') {
+			bool is_directive = p_source.find("#extern", i) == i ||
+					p_source.find("#register", i) == i ||
+					p_source.find("#include", i) == i;
+
 			Token tok;
-			tok.kind = TokenKind::COMMENT_LINE;
+			if (is_directive) {
+				tok.kind = TokenKind::CODE_TEXT;
+			} else {
+				tok.kind = TokenKind::COMMENT_LINE;
+			}
 			tok.line = line;
 			tok.col = col;
 

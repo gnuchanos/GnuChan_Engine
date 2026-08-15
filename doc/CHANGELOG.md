@@ -1,5 +1,19 @@
 # GCL Changelog
 
+## 2026-08-14 — Shift operator & char array fixes
+
+### `<<` / `>>` shift operatörleri düzeltildi
+`find_best_op` karşılaştırma taramasında shift operatörünün ikinci karakterini de
+atlamıyordu; `1 << 4` ifadesinde ikinci `<` karşılaştırma sanılıp `1 < (4)` → `1`
+dönüyordu. Artık `1 << 4 = 16` doğru hesaplanıyor. Aynı düzeltme `>>` için de geçerli.
+
+### `char x[] = {'a', 'b', 'c'}` dizi literal desteği
+`char`/`gcChar` dizileri `{...}` literal'den String'e birleştiriliyor:
+`char alphabet[] = {'a', 'b', 'c'}` artık `%s` ile `abc` basıyor
+(önceden `'a', 'b', 'c'` kalıntısı yazdırılıyordu).
+
+---
+
 ## 2026-08-14 — Runtime scope & operator fixes
 
 ### Time.Sleep artık lokal (non-blocking)

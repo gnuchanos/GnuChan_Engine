@@ -27,12 +27,30 @@ struct GCLTypeInfo {
 	}
 };
 
+/* #extern "dll" ile yuklenen kutuphaneden cekilmis fonksiyon tanimi. */
+struct GCLDllFunc {
+	String name;   /* GCL icindeki cagri adi (or. "MesajVer") */
+	String path;   /* kutuphane yolu (.dll / .so) */
+	void *handle;  /* acik kutuphane handle'i (dll_handles dualini da kapatir) */
+	void *symbol;  /* get_dynamic_library_symbol_handle sonucu */
+	bool valid;    /* sembol basariyla alindi mi */
+
+	GCLDllFunc() :
+			handle(nullptr),
+			symbol(nullptr),
+			valid(false) {
+	}
+};
+
 /* Calisma zamani tip kayit defteri (GCLScriptInstance tasir). */
 struct GCLTypeRegistry {
 	Map<StringName, String> aliases;    /* typedef adi -> orijinal tip */
 	Map<StringName, GCLTypeInfo> types; /* "Color", "Player", ... */
 	String source;                      /* calistirilan script kaynagi (fonksiyon/class icin) */
 	Map<StringName, Dictionary> classes; /* "FATHER" -> class sablonu (base/src/head) */
+	/* DLL/SO dis fonksiyonlari: "ad" -> {yol, handle, symbol}. */
+	Map<StringName, GCLDllFunc> dll_funcs;
+	Vector<void *> dll_handles;          /* acik tutulan kutuphane handle'lari (ozel yikici kapatir) */
 	int call_depth;                     /* kullanici fonksiyon cagri derinligi (recursion guard) */
 
 	/* Time.Sleep non-blocking: motor axarken bu script'in devamini erteletir.

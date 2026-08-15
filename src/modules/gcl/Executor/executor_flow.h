@@ -651,6 +651,10 @@ inline void run_for(const String &p_body, int &r_pos, const String &p_stmt,
 		String var = inner.substr(0, in_idx).strip_edges();
 		String src = inner.substr(in_idx + 4).strip_edges();
 		Variant container = executor_core::evaluate_expr(src, p_members);
+		/* Scope hijyeni: dongu degiskeni govde disinda kalmasin
+		   (daha once foreach'i yanlislikla iterdegisken kalici yapiyordu). */
+		bool had_var = p_members.has(StringName(var));
+		Variant old_var = had_var ? p_members[StringName(var)] : Variant();
 		if (container.get_type() == Variant::ARRAY) {
 			Array arr = container;
 			int guard = 0;
@@ -673,6 +677,12 @@ inline void run_for(const String &p_body, int &r_pos, const String &p_stmt,
 				}
 			}
 		}
+		/* dongu degiskenini geri al: onceki deger yoksa sil, varsa eski deger. */
+		if (had_var) {
+			p_members[StringName(var)] = old_var;
+		} else {
+			p_members.erase(StringName(var));
+		}
 		r_pos = body_after;
 		return;
 	}
@@ -685,6 +695,10 @@ inline void run_for(const String &p_body, int &r_pos, const String &p_stmt,
 	String cond_s = parts[1].strip_edges();
 	String incr_s = parts[2].strip_edges();
 
+	/* Scope hijyeni: "for(int i = ...)" dongu degiskeni govde sonunda geri alinir
+	   (dongu disinda i kalici kalmasin). Onceki deger varsa geri yuklenir. */
+	bool loop_new_var = false;
+	String loop_var;
 	if (!init_s.empty()) {
 		int eq = init_s.find("=");
 		if (eq != -1) {
@@ -693,6 +707,8 @@ inline void run_for(const String &p_body, int &r_pos, const String &p_stmt,
 			String type;
 			String name;
 			if (executor_core::split_declaration(lhs, type, name) && executor_core::is_ident_start(name[0])) {
+				loop_var = name;
+				loop_new_var = !p_members.has(StringName(name));
 				p_members[StringName(name)] = solve_arith(rhs, p_members);
 			} else if (p_members.has(StringName(lhs))) {
 				p_members[StringName(lhs)] = solve_arith(rhs, p_members);
@@ -722,6 +738,10 @@ inline void run_for(const String &p_body, int &r_pos, const String &p_stmt,
 		if (guard > 1000000) {
 			break;
 		}
+	}
+	/* dongu degiskeni temiz: yalnizca bu for'un bildirdigi degiskeni sil. */
+	if (loop_new_var && !loop_var.empty()) {
+		p_members.erase(StringName(loop_var));
 	}
 	r_pos = body_after;
 }

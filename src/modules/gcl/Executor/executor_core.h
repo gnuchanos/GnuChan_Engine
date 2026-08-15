@@ -12,6 +12,7 @@
 
 #include "executor_format.h"
 
+#include "core/io/resource_loader.h"
 #include "core/object.h"
 #include "core/os/input.h"
 #include "core/os/keyboard.h"
@@ -74,6 +75,46 @@ inline Vector<String> split_top_level(const String &p_text, CharType p_sep) {
    - Genel Object: property -> child node (harf duyarsiz) -> method cagrisi. */
 inline Variant resolve_object_member(Object *p_obj, const String &p_field) {
 	Variant out;
+
+	/* Genel Node uyeleri (gcl.md NODE hiyerarsisi): GetChild (ilk cocuk),
+	   Childs (tum cocuklar), Name, Hide, Show, Disable, Enable, Free.
+	   FPSController/RayCast ozel dallarindan ONCE kontrol edilir; boylece
+	   "REF.GetChild.Find(\"ali\").Hide" gibi zincirler her nesnede calisir. */
+	Node *as_node = Object::cast_to<Node>(p_obj);
+	if (as_node) {
+		if (p_field == "GetChild") {
+			out = as_node->get_child_count() > 0 ? Variant((Object *)as_node->get_child(0)) : Variant();
+			return out;
+		}
+		if (p_field == "Childs") {
+			Array childs;
+			for (int ci = 0; ci < as_node->get_child_count(); ci++) {
+				childs.push_back(Variant((Object *)as_node->get_child(ci)));
+			}
+			out = childs;
+			return out;
+		}
+		if (p_field == "Name") {
+			out = as_node->get_name();
+			return out;
+		}
+		if (p_field == "Hide") {
+			as_node->call("hide");
+			return out;
+		}
+		if (p_field == "Show") {
+			as_node->call("show");
+			return out;
+		}
+		if (p_field == "Free") {
+			as_node->call("queue_free");
+			return out;
+		}
+		if (p_field == "Disable" || p_field == "Enable") {
+			as_node->call("set", "disabled", p_field == "Disable");
+			return out;
+		}
+	}
 
 	FPSController *fps = Object::cast_to<FPSController>(p_obj);
 	if (fps) {
@@ -463,6 +504,32 @@ inline Array parse_tuple_literal(const String &p_body, const Map<StringName, Var
 		arr.push_back(initialize_value(parts[i], p_members));
 	}
 	return arr;
+}
+
+/* "char x[] = {'a', 'b', 'c'}" -> "abc" String'i.
+   Her eleman 'k' (tek karakter), "str" (tum metin) veya literal olmayan
+   bir deger olabilir (ilk karakteri alinir). Sonuc birleştirilmis String. */
+inline String parse_char_array_literal(const String &p_body, const Map<StringName, Variant> &p_members) {
+	String out;
+	Vector<String> parts = split_top_level(p_body, ',');
+	for (int i = 0; i < parts.size(); i++) {
+		String part = parts[i].strip_edges();
+		if (part.empty()) {
+			continue;
+		}
+		if (part.length() >= 3 && part[0] == '\'' && part[part.length() - 1] == '\'') {
+			out += part.substr(1, part.length() - 2);
+		} else if (part.length() >= 2 && part[0] == '"' && part[part.length() - 1] == '"') {
+			out += part.substr(1, part.length() - 2);
+		} else {
+			Variant v = initialize_value(part, p_members);
+			String s = variant_str(v);
+			if (!s.empty()) {
+				out += s.substr(0, 1);
+			}
+		}
+	}
+	return out;
 }
 
 /* "anahtar : deger, ..." -> Dictionary. */
@@ -1092,10 +1159,184 @@ inline Variant ops_initialize_value(const String &p_rhs, const Map<StringName, V
 		String inner = rhs.substr(7, rhs.length() - 8).strip_edges();
 		return (double)sizeof_type(inner);
 	}
+	/* Time.GetTicksMsec() / Time.GetTicksUsec() statik tablo degerleri.
+	   Time.Sleep ertelenirken kalan satirlar sure dolunca calistigindan
+	   GetTicks-okuma anindaki gercek zamani verir. */
+	if (rhs == "Time.GetTicksMsec()") {
+		return (double)OS::get_singleton()->get_ticks_msec();
+	}
+	if (rhs == "Time.GetTicksUsec()") {
+		return (double)OS::get_singleton()->get_ticks_usec();
+	}
 	return initialize_value_fwd(rhs, p_members);
 }
 
 } // namespace executor_ops
+
+namespace executor_core {
+
+/* "<Zincir>.<Metot>(args)" genel cagrisi. self'e ozel degildir:
+   NODE REF = GetNode("araba"); REF.GetChild.Find("ali").Hide
+   gibi zincirleri cozer. Cagiracak Godot nesnesi en SON cozulen OBJECT
+   segmentidir; ilgili segmentte "(" gorulurse callv yapilir.
+   Ayrica tek parcali global cagrilar da burada yakalanir:
+     GetNode("yol")   -> owner (self) uzerinden relative node
+     load("res://..") -> ResourceLoader::load
+     preload("res://")-> ResourceLoader::load */
+inline bool handle_chain_call(const String &p_line, const Map<StringName, Variant> &p_members, Variant *r_retval = nullptr) {
+	String s = p_line.strip_edges().replace(";", "").strip_edges();
+	if (s.empty() || s.find("(") == -1) {
+		return false;
+	}
+	if (s.begins_with("PrintF") || s.begins_with("print")) {
+		return false;
+	}
+
+	/* Tek parcali global cagrilar: "GetNode(...)" gibi (basinda "self." yok). */
+	if (s.begins_with("GetNode(")) {
+		int close = s.rfind(")");
+		if (close == s.length() - 1) {
+			String arg = s.substr(8, close - 8).strip_edges();
+			Variant av = initialize_value(arg, p_members);
+			String path = executor_format::variant_str(av);
+			Node *owner = nullptr;
+			if (p_members.has(StringName("self"))) {
+				Variant sv = p_members[StringName("self")];
+				Object *o = sv.get_type() == Variant::OBJECT ? sv.operator Object *() : nullptr;
+				if (o) {
+					owner = Object::cast_to<Node>(o); /* Node degilse null doner */
+				}
+			}
+			if (owner) {
+				Node *found = owner->get_node_or_null(NodePath(path));
+				if (found && r_retval) {
+					*r_retval = Variant((Object *)found);
+				}
+			}
+			return true;
+		}
+	}
+	if (s.begins_with("load(") || s.begins_with("preload(")) {
+		int close = s.rfind(")");
+		if (close == s.length() - 1) {
+			String arg = s.substr(s.find("(") + 1, close - s.find("(") - 1).strip_edges();
+			Variant av = initialize_value(arg, p_members);
+			String path = executor_format::variant_str(av);
+			if (r_retval) {
+				*r_retval = ResourceLoader::load(path);
+			}
+			return true;
+		}
+	}
+
+	/* Noktali zincir: "<root>.<seg>[.<seg>...]" */
+	int first_dot = s.find(".");
+	if (first_dot <= 0 || first_dot + 1 >= s.length()) {
+		return false;
+	}
+	String root = s.substr(0, first_dot).strip_edges();
+	if (!p_members.has(StringName(root))) {
+		return false;
+	}
+	Variant cur = p_members[StringName(root)];
+	if (cur.get_type() != Variant::OBJECT) {
+		return false;
+	}
+
+	int pos = first_dot + 1;
+	const int L = s.length();
+	while (pos < L) {
+		int seg_start = pos;
+		while (pos < L && is_ident_char(s[pos])) {
+			pos++;
+		}
+		if (pos == seg_start) {
+			return false;
+		}
+		String seg = s.substr(seg_start, pos - seg_start);
+
+		int after = pos;
+		while (after < L && (s[after] == ' ' || s[after] == '\t')) {
+			after++;
+		}
+
+		if (after < L && s[after] == '(') {
+			/* Metot cagrisi: kapanis parantezini bul. */
+			int depth = 0;
+			bool in_str = false;
+			int close = -1;
+			for (int j = after; j < L; j++) {
+				CharType c = s[j];
+				if (c == '"') {
+					in_str = !in_str;
+				} else if (!in_str && c == '(') {
+					depth++;
+				} else if (!in_str && c == ')') {
+					depth--;
+					if (depth == 0) {
+						close = j;
+						break;
+					}
+				}
+			}
+			if (close == -1 || close != L - 1) {
+				return false;
+			}
+
+			Object *obj = (Object *)cur;
+			if (obj != nullptr && obj->has_method(seg)) {
+				Array call_args;
+				String args_region = s.substr(after + 1, close - after - 1);
+				int a_start = 0;
+				for (int j = 0; j <= args_region.length(); j++) {
+					if (j == args_region.length() || args_region[j] == ',') {
+						String arg = args_region.substr(a_start, j - a_start).strip_edges();
+						if (!arg.empty()) {
+							call_args.push_back(initialize_value(arg, p_members));
+						}
+						a_start = j + 1;
+					}
+				}
+				Variant ret = obj->callv(seg, call_args);
+				if (r_retval) {
+					*r_retval = ret;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		/* Uye erisimi: OBJECT uzerinde coz. */
+		if (cur.get_type() == Variant::OBJECT) {
+			cur = resolve_object_member((Object *)cur, seg);
+		} else if (cur.get_type() == Variant::DICTIONARY) {
+			Dictionary d = cur;
+			if (!d.has(seg)) {
+				return false;
+			}
+			cur = d[seg];
+		} else {
+			return false;
+		}
+
+		while (pos < L && (s[pos] == ' ' || s[pos] == '\t')) {
+			pos++;
+		}
+		if (pos >= L) {
+			break;
+		}
+		if (s[pos] == '.') {
+			pos++;
+		} else if (s[pos] == '-' && pos + 1 < L && s[pos + 1] == '>') {
+			pos += 2;
+		} else {
+			return false;
+		}
+	}
+	return false;
+}
+
+} // namespace executor_core
 
 } // namespace gcl
 
