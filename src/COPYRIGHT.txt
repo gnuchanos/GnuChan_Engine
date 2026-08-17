@@ -1,9 +1,9 @@
-# Exhaustive licensing information for files in the GnuChanIDE Engine repository
+# Exhaustive licensing information for files in the GnuChanEngine repository
 # =========================================================================
 #
 # This file aims at documenting the copyright and license for every source
-# file in the GnuChanIDE Engine repository, and especially outline the files
-# whose license differs from the MIT/Expat license used by GnuChanIDE Engine.
+# file in the GnuChanEngine repository, and especially outline the files
+# whose license differs from the MIT/Expat license used by GnuChanEngine.
 #
 # It is written as a machine-readable format following the debian/copyright
 # specification. Globbing patterns (e.g. "Files: *") mean that they affect
@@ -27,23 +27,23 @@
 #   License: Zlib
 # The exact copyright for each file in that library *may* differ, and some
 # files or code snippets might be distributed under other compatible licenses
-# (e.g. a public domain dedication), but as far as GnuChanIDE Engine is concerned
+# (e.g. a public domain dedication), but as far as GnuChanEngine is concerned
 # the library is considered as a whole under the Zlib license.
 #
 # Nota: When linking dynamically against thirdparty libraries instead of
-# building them into the GnuChanIDE binary, you may remove the corresponding
+# building them into the GnuChanEngine binary, you may remove the corresponding
 # license details from this file.
 
 -----------------------------------------------------------------------
 
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: GnuChanIDE Engine
-Upstream-Contact: Rémi Verschelde <contact@gnuchanideengine.org>
-Source: https://github.com/gnuchanideengine/gnuchanide
+Upstream-Name: GnuChanEngine
+Upstream-Contact: Rémi Verschelde <contact@gnuchanengine.org>
+Source: https://github.com/gnuchanos/GnuChan_Engine
 
 Files: *
-Comment: GnuChanIDE Engine
-Copyright: 2014-present, GnuChanIDE Engine contributors.
+Comment: GnuChanEngine
+Copyright: 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: Expat
 
@@ -51,7 +51,7 @@ Files: ./icon.png
  ./icon.svg
  ./logo.png
  ./logo.svg
-Comment: GnuChanIDE Engine logo
+Comment: GnuChanEngine logo
 Copyright: 2017, Andrea Calabró
 License: CC-BY-4.0
 
@@ -59,14 +59,14 @@ Files: ./core/math/convex_hull.cpp
  ./core/math/convex_hull.h
 Comment: Bullet Continuous Collision Detection and Physics Library
 Copyright: 2011, Ole Kniemeyer, MAXON, www.maxon.net
- 2014-present, GnuChanIDE Engine contributors.
+ 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: Expat and Zlib
 
 Files: ./modules/fbx/fbx_parser/
 Comment: Open Asset Import Library (FBX parser)
 Copyright: 2006-2020, assimp team
- 2014-present, GnuChanIDE Engine contributors.
+ 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: BSD-3-clause
 
@@ -74,8 +74,8 @@ Files: ./platform/android/java/lib/aidl/com/android/vending/licensing/
  ./platform/android/java/lib/res/layout/status_bar_ongoing_event_progress_bar.xml
  ./platform/android/java/lib/src/com/google/android/vending/expansion/downloader/
  ./platform/android/java/lib/src/com/google/android/vending/licensing/
- ./platform/android/java/lib/src/org/gnuchanideengine/gnuchanide/input/InputManagerCompat.java
- ./platform/android/java/lib/src/org/gnuchanideengine/gnuchanide/input/InputManagerV16.java
+ ./platform/android/java/lib/src/org/gnuchanengine/gnuchanengine/input/InputManagerCompat.java
+ ./platform/android/java/lib/src/org/gnuchanengine/gnuchanengine/input/InputManagerV16.java
 Comment: The Android Open Source Project
 Copyright: 2008-2013, The Android Open Source Project
 License: Apache-2.0
@@ -86,7 +86,7 @@ Comment: The Android Open Source Project
 Copyright: 2002, Google Inc.
 License: Apache-2.0
 
-Files: ./platform/android/java/lib/src/org/gnuchanideengine/gnuchanide/utils/ProcessPhoenix.java
+Files: ./platform/android/java/lib/src/org/gnuchanengine/gnuchanengine/utils/ProcessPhoenix.java
 Comment: ProcessPhoenix
 Copyright: 2015, Jake Wharton
 License: Apache-2.0
@@ -97,14 +97,14 @@ Files: ./platform/android/power_android.cpp
  ./platform/x11/power_x11.cpp
 Comment: Simple DirectMedia Layer
 Copyright: 1997-2017, Sam Lantinga
- 2014-present, GnuChanIDE Engine contributors.
+ 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: Expat and Zlib
 
 Files: ./scene/animation/easing_equations.h
 Comment: Robert Penner's Easing Functions
 Copyright: 2001, Robert Penner
- 2014-present GnuChanIDE Engine contributors.
+ 2014-present GnuChanEngine contributors.
  2007-2014 Juan Linietsky, Ariel Manzur.
 License: Expat
 
@@ -127,7 +127,7 @@ Files: ./servers/physics/gjk_epa.cpp
  ./servers/physics/shape_sw.h
 Comment: Bullet Continuous Collision Detection and Physics Library
 Copyright: 2003-2008, Erwin Coumans
- 2014-present, GnuChanIDE Engine contributors.
+ 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: Expat and Zlib
 
@@ -135,7 +135,7 @@ Files: ./servers/physics/joints/cone_twist_joint_sw.cpp
  ./servers/physics/joints/cone_twist_joint_sw.h
 Comment: Bullet Continuous Collision Detection and Physics Library
 Copyright: 2007, Starbreeze Studios
- 2014-present, GnuChanIDE Engine contributors.
+ 2014-present, GnuChanEngine contributors.
  2007-2014, Juan Linietsky, Ariel Manzur.
 License: Expat and Zlib
 
@@ -660,7 +660,7 @@ License: CC0-1.0
  of any kind concerning the Work, express, implied, statutory or otherwise,
  including without limitation warranties of title, merchantability, fitness
  for a particular purpose, non infringement, or the absence of latent or
- other defects, accuracy, or the present or absence of errors, whether or not
+ other defects, accuracy, or the presence or absence of errors, whether or not
  discoverable, all to the greatest extent permissible under applicable law.
  .
  c. Affirmer disclaims responsibility for clearing rights of other persons
@@ -1618,7 +1618,7 @@ License: OFL-1.1
  .
  DISCLAIMER
  THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
  OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
  COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,

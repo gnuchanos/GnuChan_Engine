@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-GnuChanIDE Build Script (Windows)
+GnuChanEngine Build Script (Windows)
 Usage:
     py.exe makefile.py                      # Debug editor build (default -j{cpu_count})
     py.exe makefile.py --release            # Release_debug editor build
     py.exe makefile.py --clean              # Clean build artifacts
     py.exe makefile.py -j8                  # Override thread count
 
-Output: src/bin/GnuChanIDE.exe (Godot 3.x SCons convention)
+Output: src/bin/GnuChanEngine.exe (Godot 3.x SCons convention)
 """
 
 import os
@@ -17,7 +17,7 @@ import subprocess
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILD_DIR = os.path.join(ROOT, "src")
 BIN_DIR = os.path.join(BUILD_DIR, "bin")
-EXE = os.path.join(BIN_DIR, "GnuChanIDE.exe")
+EXE = os.path.join(BIN_DIR, "GnuChanEngine.exe")
 
 sys.path.insert(0, BUILD_DIR)
 from version import major, minor, patch, status as version_status
@@ -50,7 +50,7 @@ def main():
         else:
             extra.append(arg)
 
-    print(f"[BUILD] GnuChanIDE {VERSION}")
+    print(f"[BUILD] GnuChanEngine {VERSION}")
 
     # -j belirtilmediyse tüm çekirdekleri kullan
     if not any(a.startswith("-j") for a in extra):

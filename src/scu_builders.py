@@ -262,7 +262,7 @@ def generate_scu_files(verbose, is_release_build):
 
     # check we are running from the correct folder
     if folder_not_found("core") or folder_not_found("platform") or folder_not_found("scene"):
-        raise RuntimeError("scu_builders.py must be run from the gnuchanide folder.")
+        raise RuntimeError("scu_builders.py must be run from the gnuchanengine folder.")
         return
 
     process_folder(["core"])

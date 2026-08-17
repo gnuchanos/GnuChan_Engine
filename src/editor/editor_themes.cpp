@@ -347,7 +347,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 		preset_accent_color = Color(0.15, 0.55, 0.82);
 		preset_base_color = Color(0.99, 0.96, 0.89);
 		preset_contrast = 0.06;
-	} else { // Default - GnuChanIDE
+	} else { // Default - GnuChanEngine
 		preset_accent_color = Color(0.30, 0.06, 0.53); // #4d1088
 		preset_base_color = Color(0.11, 0.02, 0.20); // #1c0532
 		preset_contrast = default_contrast;
@@ -1446,7 +1446,7 @@ Ref<Theme> create_custom_theme(const Ref<Theme> p_theme) {
 }
 
 Ref<ImageTexture> create_unscaled_default_project_icon() {
-	// GnuChanIDE: app_icon.png (icon.png) kullan, Godot SVG DefaultProjectIcon yerine
+	// GnuChanEngine: app_icon.png (icon.png) kullan, Godot SVG DefaultProjectIcon yerine
 	Ref<Image> img = memnew(Image(app_icon_png));
 	if (img.is_valid()) {
 		// Boyutlandırma yapma, orijinal halini kullan

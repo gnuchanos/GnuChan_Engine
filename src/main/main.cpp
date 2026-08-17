@@ -970,7 +970,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 #ifdef TOOLS_ENABLED
 		editor = false;
 #else
-		const String error_msg = "This is the GnuChanIDE export template binary.\nIt cannot run standalone. Use it via the Export Template Manager (Install from File > .tpz) or provide a .pck file.\nTo run the editor, use the main GnuChanIDE.exe built with tools=yes.\n";
+		const String error_msg = "This is the GnuChanEngine export template binary.\nIt cannot run standalone. Use it via the Export Template Manager (Install from File > .tpz) or provide a .pck file.\nTo run the editor, use the main GnuChanEngine.exe built with tools=yes.\n";
 		OS::get_singleton()->print("%s", error_msg.utf8().get_data());
 		OS::get_singleton()->alert(error_msg);
 
@@ -1455,7 +1455,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 		const String boot_logo_path = String(GLOBAL_DEF("application/boot_splash/image", String())).strip_edges();
 		const bool boot_logo_scale = GLOBAL_DEF("application/boot_splash/fullsize", true);
 		const bool boot_logo_filter = GLOBAL_DEF("application/boot_splash/use_filter", true);
-		// GnuChanIDE: bootsplash her zaman pencereye göre gerilir (stretch)
+		// GnuChanEngine: bootsplash her zaman pencereye göre gerilir (stretch)
 		OS::get_singleton()->_msec_splash = OS::get_singleton()->get_ticks_msec();
 		ProjectSettings::get_singleton()->set_custom_property_info("application/boot_splash/image", PropertyInfo(Variant::STRING, "application/boot_splash/image", PROPERTY_HINT_FILE, "*.png"));
 

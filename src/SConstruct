@@ -119,12 +119,12 @@ opts = Variables(customs, ARGUMENTS)
 # Target build options
 opts.Add("p", "Platform (alias for 'platform')", "")
 opts.Add("platform", "Target platform (%s)" % ("|".join(platform_list),), "")
-opts.Add(BoolVariable("tools", "Build the tools (a.k.a. the GnuChanIDE editor)", True))
+opts.Add(BoolVariable("tools", "Build the tools (a.k.a. the GnuChanEngine editor)", True))
 opts.Add(EnumVariable("target", "Compilation target", "debug", ("debug", "release_debug", "release")))
 opts.Add("arch", "Platform-dependent architecture (arm/arm64/x86/x64/mips/...)", "")
 opts.Add(EnumVariable("bits", "Target platform bits", "default", ("default", "32", "64")))
 opts.Add(EnumVariable("optimize", "Optimization type", "speed", ("speed", "size", "none")))
-opts.Add(BoolVariable("production", "Set defaults to build GnuChanIDE for use in production", False))
+opts.Add(BoolVariable("production", "Set defaults to build GnuChanEngine for use in production", False))
 opts.Add(EnumVariable("lto", "Link-time optimization (production builds)", "none", ("none", "auto", "thin", "full")))
 
 # Components
@@ -239,7 +239,7 @@ else:
 
 if selected_platform in ["linux", "bsd", "linuxbsd"]:
     if selected_platform == "linuxbsd":
-        print('Platform "linuxbsd" is still called "x11" in GnuChanIDE. Building for platform "x11".')
+        print('Platform "linuxbsd" is still called "x11" in GnuChanEngine. Building for platform "x11".')
     selected_platform = "x11"
 
 env_base["platform"] = selected_platform
@@ -421,7 +421,7 @@ if selected_platform in platform_list:
         if cc_version_major < 9:
             print_error(
                 "Detected GCC version older than 9, which does not fully support "
-                "C++17, or has bugs when compiling GnuChanIDE. Supported versions are 9 "
+                "C++17, or has bugs when compiling GnuChanEngine. Supported versions are 9 "
                 "and later. Use a newer GCC version, or Clang 6 or later by passing "
                 '"use_llvm=yes" to the SCons command line.'
             )
@@ -454,18 +454,18 @@ if selected_platform in platform_list:
         if cc_version_major == 16 and cc_version_minor < 11:
             print_error(
                 "Detected Visual Studio 2019 version older than 16.11, which has bugs "
-                "when compiling GnuChanIDE. Use a newer VS2019 version, or VS2022."
+                "when compiling GnuChanEngine. Use a newer VS2019 version, or VS2022."
             )
             Exit(255)
         if cc_version_major == 15 and cc_version_minor < 9:
             print_error(
                 "Detected Visual Studio 2017 version older than 15.9, which has bugs "
-                "when compiling GnuChanIDE. Use a newer VS2017 version, or VS2019/VS2022."
+                "when compiling GnuChanEngine. Use a newer VS2017 version, or VS2019/VS2022."
             )
             Exit(255)
         if cc_version_major < 15:
             print_error(
-                "Detected Visual Studio 2015 or earlier, which is unsupported in GnuChanIDE. "
+                "Detected Visual Studio 2015 or earlier, which is unsupported in GnuChanEngine. "
                 "Supported versions are Visual Studio 2017 and later."
             )
             Exit(255)

@@ -1,5 +1,5 @@
-short_name = "gnuchanide"
-name = "GnuChanIDE"
+short_name = "GnuChanEngine"
+name = "GnuChanEngine"
 major = 0
 minor = 1
 patch = 0
